@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.2"
+document_version: "1.3"
 created: "2026-10-09"
 language: en
 status: draft
@@ -10,7 +10,7 @@ design_ref: "personal-knowledge-design-v1.md"
 design_version: "1.7"
 ---
 
-# Personal Knowledge System — Roadmap v1.2
+# Personal Knowledge System — Roadmap v1.3
 
 ## 1. Purpose
 
@@ -25,7 +25,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 | Stage | Version | Status | Result | Key US |
 |---|---|---|---|---|
 | 0. Skeleton and checks | v0.1 | ✅ Done | Package installs from GitHub, `kb --version` works; skills directories verified in all three clients; note schema approved | US-04, US-17, US-23 |
-| 1. Knowledge base | v0.2 | ⬜ Not done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
+| 1. Knowledge base | v0.2 | ✅ Done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ⬜ Not done | Conversation outcomes are saved to the knowledge base in all three clients, with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
 | 3. Reading: `kb-recall` | v0.4 | ⬜ Not done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
 | 4. Updates and cloud copy | v0.5 | ⬜ Not done | `kb update` in a single command; `kb sync` copies the vault to Google Drive | US-17, US-18, US-20 |
@@ -58,7 +58,7 @@ Open questions closed: folder structure and metadata schema (US, question 4); sk
 
 ### Stage 1. Knowledge base → v0.2
 
-**Status:** ⬜ Not done
+**Status:** ✅ Done (v0.2.0, 2026-10-09). Commands: `kb setup`, `kb init`, `kb doctor`, `kb where`; templates use Obsidian Templates placeholders (`{{title}}`, `{{date:YYYY-MM-DD}}`); config example in `examples/config.example.toml`.
 
 **Goal:** the knowledge base itself, which the agents will work with, comes into existence.
 
@@ -166,3 +166,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.0 — 2026-10-09:** first version of the roadmap, based on user stories v1.7 and design v1.6.
 - **1.1 — 2026-10-09:** added a completion status for each stage (in the overview table and in each stage section).
 - **1.2 — 2026-10-09:** stage 0 done: package `v0.1.0` installs from GitHub, note schema and client paths recorded; references updated to user stories 1.8 and design 1.7.
+- **1.3 — 2026-10-09:** stage 1 done: package `v0.2.0` with `kb setup`, `kb init`, `kb doctor` v0 and `kb where`; vault templates with Mermaid and attachment examples; CI smoke test on a temporary vault.

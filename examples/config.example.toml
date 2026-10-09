@@ -1,0 +1,15 @@
+# Example of ~/.config/ms-kb/config.toml (note-schema-v0 §6).
+# `kb setup` writes this file for you; KB_CONFIG overrides its location.
+schema_version = 1
+default_kb = "main"
+
+[kbs.main]
+vault_path = "~/Knowledge/main"
+
+[clients]
+enabled = ["claude-code", "codex", "cursor"]
+
+# Stage 4:
+# [kbs.main.sync]
+# provider = "rclone"
+# remote = "gdrive:kb-backup/main"

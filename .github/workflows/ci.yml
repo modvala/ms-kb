@@ -21,3 +21,14 @@ jobs:
         run: |
           uv tool install dist/*.whl
           kb --version
+      - name: Smoke test the installed CLI on a temporary vault
+        env:
+          KB_CONFIG: ${{ runner.temp }}/kb/config.toml
+          VAULT: ${{ runner.temp }}/vault
+        run: |
+          kb setup --vault "$VAULT" --clients claude-code --yes
+          kb init
+          kb doctor
+          test "$(kb where)" = "$(cd "$VAULT" && pwd -P)"
+          test -f "$VAULT/templates/concept.md"
+          test -f "$VAULT/learning_profile.md"
