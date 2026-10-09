@@ -18,7 +18,21 @@ kb doctor     # checks the configuration and the vault
 kb where      # prints the vault path
 ```
 
-Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder.
+`kb setup` also installs the `add-knowledge` skill into the chosen clients (`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex; Cursor reads both). Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder.
+
+## Saving knowledge
+
+At the end of a learning conversation, invoke the skill: `/add-knowledge` in Claude Code and Cursor, `$add-knowledge` in Codex. Optionally name a topic to save only part of the conversation. The agent writes a learning-session note, creates or extends concept notes, and lists the files it changed. Before extending existing notes it shows a plan and waits for your confirmation.
+
+The skill writes only through the CLI, which you can also use directly:
+
+```bash
+kb search rag --type concept           # text, --topic, --field created_by.skill=add-knowledge, --json
+kb new concept --title RAG --topic rag --body-file notes.md
+kb extend concepts/RAG.md --body-file more.md   # appends '## Section' blocks, never rewrites
+kb validate                            # check every note against the schema
+kb install-skills                      # reinstall the skills for the configured clients
+```
 
 The configuration lives in `~/.config/ms-kb/config.toml` (`KB_CONFIG` overrides the path); see [examples/config.example.toml](examples/config.example.toml).
 

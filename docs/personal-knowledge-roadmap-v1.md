@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.3"
+document_version: "1.4"
 created: "2026-10-09"
 language: en
 status: draft
 requirements_ref: "personal-knowledge-user-stories-v1.md"
 requirements_version: "1.8"
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.7"
+design_version: "1.9"
 ---
 
-# Personal Knowledge System — Roadmap v1.3
+# Personal Knowledge System — Roadmap v1.4
 
 ## 1. Purpose
 
@@ -28,7 +28,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 | 1. Knowledge base | v0.2 | ✅ Done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ⬜ Not done | Conversation outcomes are saved to the knowledge base in all three clients, with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
 | 3. Reading: `kb-recall` | v0.4 | ⬜ Not done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
-| 4. Updates and cloud copy | v0.5 | ⬜ Not done | `kb update` in a single command; `kb sync` copies the vault to Google Drive | US-17, US-18, US-20 |
+| 4. Updates and cloud copy | v0.5 | ⬜ Not done | `kb update` in a single command; sync and data-integrity design chosen (Git/GitHub and/or Google Drive) and implemented in `kb sync`; deleted notes are detected and restored | US-13, US-17, US-18, US-20 |
 | 5. Stabilization | v1.0 | ⬜ Not done | CI on typical scenarios, provenance queries, documentation; the MVP is ready for daily use | US-12, US-13, US-23 |
 | Later | v1.x+ | — | Extensions from the backlog (§4) | US-02, US-03, US-05, US-06, US-14, US-21, US-22 |
 
@@ -73,7 +73,7 @@ Work:
 
 ### Stage 2. Writing: `add-knowledge` → v0.3
 
-**Status:** ⬜ Not done
+**Status:** ⬜ Not done. Implemented: `kb search`, `kb new`, `kb extend`, `kb validate`, `kb install-skills` (also run by `kb setup`), skills in `kb doctor`, the `add-knowledge` skill. Decided: the CLI writes notes and extends append-only; a plan is shown before extending existing notes (design §9.1, §11). Remaining: treating `learning_profile.md` as user data (see below), hands-on runs in Claude Code, Codex and Cursor, then the `v0.3.0` release.
 
 **Goal:** the main MVP scenario (US-24) works end to end.
 
@@ -84,6 +84,7 @@ Work:
 - Marking what is confirmed vs. what is an assumption; handling contradictions with older notes (US-10).
 - `kb install-skills` / installing skills into the chosen clients during `kb setup`; copying with the package version recorded.
 - Resolving the open question: whether to show a plan before editing existing notes.
+- `learning_profile.md` as user data (design §12.4): it is extended by `kb extend`, but `kb init` treats it as a regenerable file, so after an accidental deletion `kb doctor` suggests `kb init`, which recreates an empty profile and hides the loss. Split the vault files into regenerable and user data: `kb doctor` points to a restore for missing user data, and `kb init` recreates the profile only on a fresh vault or with an explicit flag.
 
 **Done when:** in each of the three clients, invoking `add-knowledge` after a learning conversation creates a `learning-session` and creates or extends `concept` notes; frontmatter passes validation; a repeated invocation on the same topic extends rather than duplicates.
 
@@ -112,10 +113,18 @@ Work:
 
 - `kb update`: `uv tool upgrade` + reinstalling skills into all chosen clients in a single command.
 - Version consistency checks: `kb doctor` and a warning in the skill before writing.
-- `kb sync` via `rclone`: one-way copy of the vault to Google Drive with an archive of old versions (design §12.1); one-time authorization setup.
-- Decision: run `kb sync` manually, on a schedule, or after `add-knowledge`.
+- **Design decision on sync and data integrity** (design §12.3, §12.4), made before any implementation:
+  - Choose the mechanism: Git + private GitHub, Google Drive via `rclone` (§12.1), or both; the second independent copy (Time Machine or Drive).
+  - How changes made outside `kb` (Obsidian, file manager) get into the copy; when `kb sync` runs: manually, on a schedule, or after every write.
+  - How data validity is maintained: regenerable vs user-data files, detection of deleted notes (broken wiki-links, a manifest of notes written by `kb`), the restore flow, and the rule that a local deletion never reaches the copy without an archived version.
+  - Record the decision in the design and requirements (decisions 9 and 17, §12, §14, US-20), including the `kb doctor` warning about Git and the sync section of the configuration.
+- **Implementation of the chosen design:**
+  - `kb sync` for the chosen mechanism (for Git: commits by `kb` after each write, `git add -A` for outside changes, push to the private repository; for `rclone`: `--backup-dir`, never a plain `sync`); one-time authorization setup.
+  - `kb doctor` / `kb validate`: broken wiki-links and notes missing compared with the manifest.
+  - `kb restore` for deleted or damaged notes.
+  - Skill rule: never delete, move or rename vault files and never run Git there; only `kb` changes the vault.
 
-**Done when:** releasing a new version and running `kb update` updates the skills in all clients; after a note is accidentally deleted, it can be restored from Google Drive.
+**Done when:** releasing a new version and running `kb update` updates the skills in all clients; the sync and data-integrity design is recorded; after a note is accidentally deleted, `kb doctor` reports it and it can be restored from the chosen copy.
 
 ### Stage 5. Stabilization → v1.0
 
@@ -144,7 +153,7 @@ The order is approximate: items at the top are closer to the current value.
 | Hook reminder before context compaction | Fewer losses in long conversations | design §9.1, §11.2 |
 | "Librarian" subagent | Searching a large vault without cluttering the context | design §9.1 |
 | Semantic/hybrid search | Better retrieval on a large knowledge base | US-08 |
-| Note change history, `kb backup` snapshots | More reliable restore and revision | US-13, design §12.1 |
+| Note change history, `kb backup` snapshots (covered by stage 4 if Git is chosen) | More reliable restore and revision | US-13, design §12.1, §12.3 |
 | MCP wrapper over the core | Access for clients without a shell | design §9.1 |
 | ChatGPT | Desktop Work mode or a cloud inbox | design §12.2 |
 | Mobile access | Reading/editing the knowledge base from a phone | US-20 |
@@ -159,7 +168,8 @@ The order is approximate: items at the top are closer to the current value.
 | The agent loses early details of a long conversation after context compaction | Stage 2 | Recommend invoking `add-knowledge` before compaction; later, a hook reminder |
 | Duplicates and knowledge "smeared" across notes | Stages 2–3 | Search before writing, duplicate checks in the CLI, change report |
 | CLI and skills versions diverge | Stage 4 | `kb update` as a single command, `kb doctor`, version check in the skill |
-| The cloud copy does not protect against everything | Stage 4 | One-way sync with a version archive; snapshots are in the backlog |
+| The cloud copy does not protect against everything | Stage 4 | One-way sync with a version archive or Git history; a second independent copy; detection of deleted notes in `kb doctor` |
+| A recreated empty file hides lost user data (`learning_profile.md`) | Stage 2 | User-data files are never silently recreated by `kb init` |
 
 ## 6. Document history
 
@@ -167,3 +177,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.1 — 2026-10-09:** added a completion status for each stage (in the overview table and in each stage section).
 - **1.2 — 2026-10-09:** stage 0 done: package `v0.1.0` installs from GitHub, note schema and client paths recorded; references updated to user stories 1.8 and design 1.7.
 - **1.3 — 2026-10-09:** stage 1 done: package `v0.2.0` with `kb setup`, `kb init`, `kb doctor` v0 and `kb where`; vault templates with Mermaid and attachment examples; CI smoke test on a temporary vault.
+- **1.4 — 2026-10-10:** stage 2: `learning_profile.md` treated as user data. Stage 4: a design decision on sync and data integrity (Git/GitHub and/or Google Drive, design §12.3–§12.4) before implementing `kb sync`, plus detection and restore of deleted notes. Design reference updated to 1.9.

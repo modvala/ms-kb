@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.7"
+document_version: "1.9"
 created: "2026-10-05"
-updated: "2026-10-09"
+updated: "2026-10-10"
 language: en
 status: discussion_baseline
 requirements_ref: "personal-knowledge-user-stories-v1.md"
-requirements_version: "1.7"
+requirements_version: "1.9"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.7
+# Personal Knowledge System — Design & Contracts v1.9
 
 ## 1. Purpose and status
 
@@ -493,7 +493,7 @@ Important constraints:
 - **Provenance is stamped by the CLI, not the model.** The skill, version and date values come from the installed package, which rules out invented metadata (US-12).
 - **A subagent does not see the main conversation.** The summary for `add-knowledge` is produced only by the main agent; source search and reading can be delegated to subagents.
 - **Skills are written to degrade gracefully:** if subagents or hooks are not available in a client, the skill performs the steps itself.
-- The final split of operations between the CLI and the skill (for example, whether the agent writes the file or the CLI writes it from the content passed to it) is refined during implementation.
+- **The CLI writes the notes (decided in v1.8).** The skill passes the content to `kb new` / `kb extend`; the CLI renders the note, stamps provenance, validates it and only then writes it. `kb extend` only appends to sections and lists, so existing text is never rewritten. The agent does not edit note files with its own tools.
 
 ## 10. How the agent reads context
 
@@ -533,7 +533,7 @@ Retrieval describes the process of extracting context and does not imply mandato
 | A new task/application status | The corresponding external system |
 | A confirmed conclusion from practice | A knowledge note referencing the external basis |
 
-**Write policy (decided in v1.1):** writing happens only on explicit skill invocation by the user. The invocation itself is the permission to write. The agent does not create or change notes on its own initiative, and there is no automatic saving. Open: whether to show a plan of changes before editing existing notes.
+**Write policy (decided in v1.1):** writing happens only on explicit skill invocation by the user. The invocation itself is the permission to write. The agent does not create or change notes on its own initiative, and there is no automatic saving. **Decided in v1.8:** new notes are created right away; before extending existing notes, the skill shows a plan (note, sections, what is added) and waits for the user's confirmation.
 
 Filtering by skill/version makes it possible to find old materials. Updating with a new skill or with current sources keeps the original creation and the new processing distinguishable. Automatic regular rebuilds of all research are not approved.
 
@@ -577,7 +577,7 @@ GitHub has two roles in the system, and neither is related to storing knowledge:
 | Repository of the distributed package | Library code, skills, templates, CI | Tools that work with the KB |
 | Supporting code source | Code/issues/PRs of a practical project | External basis for project knowledge; the KB holds only links and conclusions |
 
-Without a Git repository, the vault has no built-in history of note changes. Whether it is needed and how to provide it (the provider's version history, local history without a remote repository, or something else) remains an open question (§7).
+Without a Git repository, the vault has no built-in history of note changes. Whether it is needed and how to provide it (the provider's version history, local history without a remote repository, or something else) remains an open question (§14). **Under consideration (v1.9):** a separate private Git repository for the vault as its history and backup, which would revise the exclusion of GitHub above — §12.3. Protection of the data itself against accidental deletion — §12.4.
 
 ### 12.1. Local vault and Google Drive sync (v1.4)
 
@@ -609,6 +609,60 @@ If the connection is lost, local data is preserved. Diverging changes are detect
 
 The index, if used, is derived state that can be rebuilt from the notes. Transferring it is not a condition for preserving canonical knowledge. Indexes, configuration and sync state of different instances are not mixed by default.
 
+### 12.3. Under consideration: Git as the vault's history and backup (v1.9)
+
+**Status: open, not decided.** This section records a proposal for further consideration. Until the decision is made in roadmap stage 4, §12 and §12.1 remain the current baseline. The original reason for excluding GitHub (v1.2) was not recorded, so the exclusion is reconsidered on its merits.
+
+**Why Git fits this vault:**
+
+- Notes are plain Markdown text: Git gives diffs, full history and restoration of deleted files out of the box (`git log --diff-filter=D`, `git checkout <commit>^ -- <path>`). This also answers the open "note change history" question (§14, US-13).
+- All agent writes go through the CLI (§9.1), so `kb` can commit after every successful write with a message carrying provenance, for example `add-knowledge v0.3.0: extend concepts/RAG.md`. The history becomes a log of which skill and version changed what (§7, US-12).
+- A private GitHub repository is an off-machine copy, just like Google Drive. For a single user, both are third-party services, so privacy does not clearly favor either.
+
+**Proposed scheme (an example, not an approved contract):**
+
+| Part | What happens |
+|---|---|
+| Local history | The vault root is a Git repository of its own (never the package repository or a project repository). `kb` commits after each `kb new` / `kb extend` |
+| Changes outside `kb` | Edits and deletions made in Obsidian or the file manager are committed by `kb sync` (`git add -A`), on a schedule or via an Obsidian Git plugin — to be decided |
+| Off-machine copy | `kb sync` pushes to a private GitHub repository dedicated to this vault |
+| Restore | `kb restore <path>` returns a deleted or damaged note from history |
+| Second independent copy | Time Machine (free, already on macOS); Google Drive becomes optional |
+
+**Options to choose from:**
+
+1. **Git + private GitHub only** (recommended for the MVP): history, deletion recovery and an off-machine copy with one mechanism; Time Machine as the second copy.
+2. **Git + GitHub + Google Drive**: two independent cloud copies. Both are one-way, so they do not conflict (unlike two two-way sync mechanisms, §12), but setup is heavier (`rclone`, Google authorization).
+3. **Google Drive only** (current §12.1): a cloud copy with an archive of old versions, but no convenient change history.
+
+**Risks and mitigations:**
+
+| Risk | Mitigation |
+|---|---|
+| Git is not a backup by itself: an agent may run `git push --force` or `git reset --hard`; force-push protection for private repositories may require a paid GitHub plan (to verify) | Only `kb` runs Git in the vault; skills forbid Git commands there; a second independent copy (Time Machine or Drive) |
+| Binary attachments bloat the repository; GitHub rejects files over 100 MB | Ignore large files in `attachments/` via `.gitignore`, or use Git LFS |
+| Secrets pasted into a conversation end up in a note and are pushed | A simple check for key-like strings in `kb` before committing; notes must not contain secrets |
+| Phone access through Git is inconvenient | Phone access is deferred (US-20); Drive can be added later for it |
+
+**What changes if the proposal is accepted:** decisions 9 and 17 (§2), §12/§12.1, §14, US-20 and the GitHub boundaries in the requirements; the `kb doctor` warning about Git (it should warn only when the vault is inside a *foreign* repository, not when the vault root is its own repository); the sync section of the configuration (`provider = "git"` with a remote instead of `provider = "rclone"`).
+
+### 12.4. Data integrity: protection against accidental deletion (v1.9)
+
+**Status: open, for further consideration together with §12.3.** Files in the vault fall into two classes that need different protection:
+
+| Class | Files | If deleted |
+|---|---|---|
+| Regenerable | Folders, `templates/*.md`, `README.md` | `kb doctor` reports them; `kb init` recreates them |
+| User data | All notes and `learning_profile.md` (extended by `kb extend`) | Cannot be regenerated; restore only from history or a backup |
+
+`learning_profile.md` is currently created by `kb init` like a regenerable file. If it is deleted, `kb doctor` suggests `kb init`, which silently recreates an empty profile and hides the loss. It must be treated as user data: `kb doctor` points to a restore instead, and `kb init` recreates it only on a fresh vault or with an explicit flag. This is fixed in the current stage (roadmap stage 2), independently of the sync decision.
+
+Protection of user data in three layers:
+
+- **Prevent.** The CLI has no delete command and extends append-only (§11). Skills forbid deleting, moving or renaming vault files and any change outside `kb`. Optionally, client permission rules deny direct edits of the vault path (they do not cover shell commands such as `rm`).
+- **Detect.** `kb doctor` / `kb validate` report broken wiki-links (a deleted note leaves dangling `[[...]]` links), and compare the vault with a manifest of notes written by `kb` (kept outside the vault, next to `installed.toml`) to list notes that disappeared.
+- **Recover.** From Git history (§12.3) and/or the cloud copy (§12.1). Whatever the mechanism, a local deletion must never propagate to the copy without an archived version (for `rclone`: `--backup-dir` or `copy`, never a plain `sync`). The copy is updated automatically after each write, not only manually.
+
 ## 13. Versions, CI and package maintenance
 
 The package version is tied to a state of the source code. The installed version can be determined; a chosen release can be installed in a documented way. The release history distinguishes changes to skills, compatibility and configuration schemas.
@@ -630,8 +684,9 @@ Updating the package does not overwrite user Markdown files. Configuration chang
 | Access | Direct access to vault files from Claude Code/Codex/Cursor in the MVP; connectors to supporting sources | MCP for remote clients after the MVP |
 | Skills | Shipped with the package and the user scope; portable `SKILL.md` format and install directories — [clients-v0.md](clients-v0.md); the first skill is `add-knowledge` | The rest of the skills list; Cursor duplicates and global instruction |
 | Learning profile | Brief context separate from detailed knowledge | Format and loading conditions |
-| Writing | Explicit skill invocation only; create/extend without duplication | A plan of changes before editing existing notes |
-| Synchronization | Local vault; cloud copy in Google Drive as a separate step; GitHub excluded for the vault | Mechanism (`kb sync` via `rclone` is recommended), how it is triggered, mobile access (deferred), note change history |
+| Writing | Explicit skill invocation only; create/extend without duplication; the CLI writes notes and extends append-only; a plan is shown before existing notes are extended | — |
+| Synchronization | Local vault; cloud copy in Google Drive as a separate step; GitHub excluded for the vault (under reconsideration, §12.3) | Git + private GitHub vs Google Drive vs both (§12.3); how sync is triggered; mobile access (deferred); note change history |
+| Data integrity | The CLI never deletes and extends append-only | Regenerable vs user-data files, detection of deleted notes, restore (§12.4) |
 | ChatGPT | Out of scope at this stage | Possible future paths — §12.2 |
 | Maintenance | Versions and CI | Release process, migrations, whether CD is needed |
 
@@ -647,3 +702,5 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.5 — 2026-10-09:** ChatGPT excluded from scope: §12.2 reduced to notes on future paths (desktop Work, cloud inbox, MCP), inbox pickup removed from `kb sync`. Updated §2.1, §9, §14.
 - **1.6 — 2026-10-09:** added §9.1 "AI component architecture": skills + CLI in the MVP; MCP, subagents and hooks later as extensions; provenance is stamped by the CLI.
 - **1.7 — 2026-10-09:** roadmap stage 0: note schema, vault structure and configuration moved to `note-schema-v0.md`, client paths to `clients-v0.md`. Decided: `insight` is not a type (§5.1), `skill_ref` points to the release tag (§7), configuration is TOML (§14). Updated §4.1, §6.1, §14.
+- **1.8 — 2026-10-09:** roadmap stage 2: the CLI writes notes (`kb new`, append-only `kb extend`), the skill passes content (§9.1); a plan is shown before extending existing notes (§11). Updated §14.
+- **1.9 — 2026-10-10:** for further consideration: §12.3 — Git with a private GitHub repository as the vault's history and backup (revises the v1.2 exclusion of GitHub; not decided); §12.4 — data integrity: regenerable vs user-data files, `learning_profile.md` as user data, detection and recovery of deleted notes. Updated §12, §14.

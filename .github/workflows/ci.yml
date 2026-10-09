@@ -25,10 +25,22 @@ jobs:
         env:
           KB_CONFIG: ${{ runner.temp }}/kb/config.toml
           VAULT: ${{ runner.temp }}/vault
+          HOME: ${{ runner.temp }}/home
         run: |
-          kb setup --vault "$VAULT" --clients claude-code --yes
+          mkdir -p "$HOME"
+          kb setup --vault "$VAULT" --clients claude-code,codex --yes
           kb init
           kb doctor
           test "$(kb where)" = "$(cd "$VAULT" && pwd -P)"
           test -f "$VAULT/templates/concept.md"
           test -f "$VAULT/learning_profile.md"
+          test -f "$HOME/.claude/skills/add-knowledge/SKILL.md"
+          test -f "$HOME/.agents/skills/add-knowledge/SKILL.md"
+          printf '## Explanation\nRetrieval plus generation.\n' \
+            | kb new concept --title RAG --topic rag --skill add-knowledge --body-file -
+          printf '## Insights\n- Reranking helps.\n' \
+            | kb extend concepts/RAG.md --summary "Added an insight" --skill add-knowledge --body-file -
+          if kb new concept --title rag --topic rag; then echo "duplicate was not refused"; exit 1; fi
+          kb search rag --json | grep -q '"title": "RAG"'
+          kb search --field updates.skill=add-knowledge | grep -q RAG.md
+          kb validate

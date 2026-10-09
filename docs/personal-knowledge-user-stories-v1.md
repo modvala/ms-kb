@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — User Stories"
-document_version: "1.8"
+document_version: "1.9"
 created: "2026-10-05"
 updated: "2026-10-09"
 language: en
@@ -8,7 +8,7 @@ status: requirements_baseline
 origin: "Decisions from discussions with the user, consolidated into user stories"
 ---
 
-# Personal Knowledge System — User Stories v1.8
+# Personal Knowledge System — User Stories v1.9
 
 This document records the desired outcome and the decisions made about the personal knowledge base. It does not mean that integrations are already connected or that the system has been implemented. Acceptance criteria turn agreements into verifiable behavior; specific tools and unresolved questions are listed separately.
 
@@ -411,7 +411,7 @@ These items are not considered accepted technical decisions:
 3. Retrieval for the first implementation: text, semantic or hybrid search; the model and indexing method if needed.
 4. ~~Folder structure and metadata schema~~ — decided in v1.8: [note-schema-v0.md](note-schema-v0.md). Open: the source registry format.
 5. The minimal set of skills besides `add-knowledge` and how entry instructions are connected to each client.
-6. ~~Write policy~~ — decided in v1.3: only on explicit skill invocation (US-24). Open: whether to show a plan of changes before editing existing notes.
+6. ~~Write policy~~ — decided in v1.3: only on explicit skill invocation (US-24). ~~Plan before editing~~ — decided in v1.9: new notes are created right away; before existing notes are extended, the agent shows a plan and waits for confirmation (design §11).
 7. Storage of note history, exact skill versions and provenance changes.
 8. ~~MVP scope~~ — decided in v1.3 (see "MVP decisions"). Open: the order in which additional sources are connected.
 9. ~~Language and package manager~~ — decided in v1.3: Python + `uv`, installation from GitHub. ~~Install/update scheme~~ — decided in v1.5: `uv tool install` + `setup`, updating in a single command. Open: final command names.
@@ -451,3 +451,4 @@ The knowledge base is convenient to read and extend both directly and through co
 - **1.6 — 2026-10-09:** the vault is stored locally outside Google Drive, sync is a separate step (US-20). ChatGPT brought back as a place for learning chats: materials arrive via a cloud inbox and are processed by `add-knowledge` (US-18, US-24). Added open question 14.
 - **1.7 — 2026-10-09:** ChatGPT excluded from scope at this stage; the cloud inbox and pulling materials during sync removed. Updated "MVP decisions", US-18, US-20, US-24, open question 14.
 - **1.8 — 2026-10-09:** roadmap stage 0: open questions 4, 10 and 12 decided with links to `note-schema-v0.md` and `clients-v0.md`.
+- **1.9 — 2026-10-09:** roadmap stage 2: open question 6 decided (a plan before extending existing notes).

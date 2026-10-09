@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Client Skills and Instructions v0"
-document_version: "0.1"
+document_version: "0.2"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
@@ -43,6 +43,7 @@ Sources: [Claude Code skills](https://code.claude.com/docs/en/skills), [Claude C
    - Claude Code and Codex: `kb setup` adds a block between markers `<!-- ms-kb:begin -->` / `<!-- ms-kb:end -->` to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and replaces only that block on update. Codex respects `CODEX_HOME`.
    - Cursor: there is no file for User Rules. `kb setup` prints the text to paste into Settings → Rules. Without it, `kb-recall` still works through its `description`. This is a known gap for US-15.
 5. **Versions in provenance.** The model does not report skill versions (in Claude Code it does not even see the frontmatter, §3). The CLI knows the version of each installed skill from `installed.toml` and stamps it itself (note schema §3). `metadata.version` in `SKILL.md` is for humans and for `kb doctor`.
+6. **Agent in provenance.** The CLI fills `agent` only from environment variables seen hands-on in the client's shell: Claude Code sets `CLAUDECODE=1` (verified in the desktop Code tab; it also sets `AI_AGENT=claude-code_<version>_agent`). Codex and Cursor are checked in stage 2; until a variable is confirmed, `agent` is omitted.
 
 ## 3. Hands-on check (stage 0)
 
@@ -81,3 +82,4 @@ metadata:
 ## 5. Document history
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
+- **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6).

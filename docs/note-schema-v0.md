@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Note Schema, Vault Structure and Configuration v0"
-document_version: "0.1"
+document_version: "0.2"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
@@ -16,7 +16,7 @@ Version 0 means it can still change before v1.0. Any change to it is recorded in
 
 ## 1. Frontmatter: common fields
 
-All notes are Markdown files with YAML frontmatter. Dates are `YYYY-MM-DD` strings in quotes.
+All notes are Markdown files with YAML frontmatter. Dates are `YYYY-MM-DD` strings in quotes. The validator also accepts unquoted dates (`created: 2026-10-09`), because Obsidian Properties writes them that way.
 
 | Field | Required | Format | Purpose |
 |---|---|---|---|
@@ -96,7 +96,7 @@ updates:
 ```
 
 - Title-based names (`concepts/RAG.md`) make `[[RAG]]` work in Obsidian without paths. Characters not allowed in file names (`/ \ : * ? " < > |`, `#`, `^`, `[`, `]`) are removed from the title when the file name is built; the full title stays in `title`.
-- A slug is lowercase ASCII words joined by `-`.
+- A slug is lowercase ASCII words joined by `-`. `kb new` builds it from the title; when the title gives no ASCII words (for example a Cyrillic title), `--slug` is required.
 - The folder matches the type, but the type is defined by `type`, not by the folder (design §5.1). The validator warns if they disagree.
 - `templates/` is overwritten only by an explicit command (stage 1: `kb init` creates it and does not touch existing files).
 - `.obsidian/` is created by Obsidian itself; the package does not write to it.
@@ -156,7 +156,17 @@ enabled = ["claude-code", "codex", "cursor"]
 - The list of skills installed by the CLI and their versions is kept separately, in `~/.config/ms-kb/installed.toml` (stage 2). It is state, not settings.
 - **Skills never read this file.** They call the CLI (for example, `kb where` in stage 1, `kb search` in stage 2). The file format stays internal to the CLI, and skills do not depend on the current working folder (US-18).
 
-## 7. Validation (stage 2)
+## 7. Validation and writing (stage 2)
+
+Notes are written only by the CLI (design §9.1):
+
+- `kb new TYPE --title … --topic …` builds the frontmatter, takes the body from stdin/a file (or the type template), stamps `created_by` when `--skill` is given, validates and writes.
+- `kb extend PATH` appends `## Section` blocks to the matching sections (a missing section is created before `## Related`), skips bullet lines already present in the section, merges `topics`/`related`/`sources` without duplicates, sets `updated` and, with `--skill`, appends an `updates` entry. Existing text is never rewritten. `learning_profile.md` can be extended too; it gets no provenance.
+- `kb validate [PATH…]` checks notes (by default every note in the type folders).
+
+**Duplicates.** `kb new` refuses to create a note when the vault already has the same file, a note with the same file name in any folder (it would make `[[links]]` ambiguous), or a note of the same type with the same title or alias. Comparison ignores case, spaces and punctuation. A title similar to an existing one of the same type (similarity ≥ 0.85) is refused unless `--allow-similar` is passed. Learning sessions are dated and expected to repeat topics, so only the file itself counts for them.
+
+**Skill versions.** `skill_version` comes from `~/.config/ms-kb/installed.toml`, i.e. from the skill copy the agent reads; `skill_ref` points to the tag of the package that installed it. `agent` is set only from environment variables verified for the client ([clients-v0.md](clients-v0.md) §2).
 
 Errors (the note is not written):
 
@@ -175,3 +185,4 @@ Warnings:
 ## 8. Document history
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
+- **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from.
