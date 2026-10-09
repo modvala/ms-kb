@@ -201,6 +201,23 @@ def test_validate_reports_errors(vault, kb, capsys):
     assert "concepts/Broken.md: error: invalid frontmatter" in out
 
 
+def test_validate_accepts_vault_relative_paths(vault, kb, capsys, tmp_path, monkeypatch):
+    new_rag(kb)
+    monkeypatch.chdir(tmp_path)
+    capsys.readouterr()
+    assert main(["validate", "concepts/RAG.md"]) == 0
+    assert "1 note(s), 0 error(s)" in capsys.readouterr().out
+    assert main(["validate", "concepts/Missing.md"]) == 1
+
+
+def test_validate_skips_profile_and_templates(vault, capsys):
+    capsys.readouterr()
+    assert main(["validate", "learning_profile.md", "templates/concept.md"]) == 0
+    out = capsys.readouterr().out
+    assert "learning_profile.md: skipped: not a note" in out
+    assert "0 note(s), 0 error(s)" in out
+
+
 def test_search_cli(vault, kb, capsys):
     new_rag(kb)
     capsys.readouterr()

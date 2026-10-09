@@ -14,11 +14,11 @@ from ms_kb.config import (
     load_config,
     save_config,
 )
-from ms_kb.notes import NOTE_TYPES, NoteError, read_note
+from ms_kb.notes import NOTE_TYPES, PROFILE, NoteError, read_note
 from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills
-from ms_kb.vault import check_vault, git_work_tree, init_vault
+from ms_kb.vault import check_vault, git_work_tree, has_notes, init_vault
 from ms_kb.write import WriteError, extend_note, new_note, save
 
 DEFAULT_KB = "main"
@@ -61,10 +61,27 @@ def _parse_clients(value: str) -> list[str]:
     return clients
 
 
-def _init_kb(cfg: Config | None, name: str, vault: str, clients: list[str] | None = None) -> None:
-    """Create the vault structure and record it in the configuration."""
-    for rel, status in init_vault(Path(vault).expanduser()):
-        print(f"  {status:8} {rel}")
+PROFILE_HINT = (
+    "user data: restore it from a backup (Obsidian File recovery, Time Machine); "
+    "kb init --new-profile starts an empty one"
+)
+
+
+def _init_kb(
+    cfg: Config | None, name: str, vault: str, clients: list[str] | None = None, new_profile: bool = False
+) -> None:
+    """Create the vault structure and record it in the configuration.
+
+    The learning profile is user data: it is created on a new vault (not yet
+    configured and without notes) or with `new_profile`, never silently
+    recreated on a vault that is already in use (design §12.4).
+    """
+    path = Path(vault).expanduser()
+    known = cfg is not None and any(_same_path(kb.vault_path, vault) for kb in cfg.kbs.values())
+    fresh = not known and not (path.is_dir() and has_notes(path))
+    for rel, status in init_vault(path, user_files=fresh or new_profile):
+        hint = f" ({PROFILE_HINT})" if status == "missing" else ""
+        print(f"  {status:8} {rel}{hint}")
     if cfg is None:
         cfg = Config(default_kb=name)
     cfg.kbs[name] = KbConfig(vault_path=vault)
@@ -91,7 +108,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             )
 
     print(f"Vault {name!r}: {Path(vault).expanduser()}")
-    _init_kb(cfg, name, vault)
+    _init_kb(cfg, name, vault, new_profile=args.new_profile)
     return 0
 
 
@@ -174,10 +191,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         report("error", f"vault {cfg.default_kb!r} not found at {vault}; run kb init {kb.vault_path}")
     else:
         report("ok", f"vault {cfg.default_kb!r} at {vault}")
-        missing = check_vault(vault)
+        missing, lost = check_vault(vault)
         if missing:
             report("error", f"missing in vault: {', '.join(missing)}; run kb init")
-        else:
+        for rel in lost:
+            report("error", f"{rel} is missing ({PROFILE_HINT})")
+        if not missing and not lost:
             report("ok", "vault structure complete")
         if repo := git_work_tree(vault):
             report("warn", f"vault is inside a Git work tree ({repo}); keep the vault out of Git")
@@ -319,16 +338,28 @@ def cmd_extend(args: argparse.Namespace) -> int:
     return _finish(result, args.dry_run)
 
 
+def _note_arg(vault: Path, arg: str) -> Path:
+    """A note path as printed by kb new/extend (vault-relative) or a path from the current folder."""
+    path = Path(arg).expanduser()
+    if not path.is_absolute() and ((vault / path).exists() or not path.exists()):
+        path = vault / path
+    return path.resolve()
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     vault = _vault()
-    paths = [Path(p).expanduser().resolve() for p in args.paths] or list(note_files(vault))
-    errors = warnings = 0
+    paths = [_note_arg(vault, p) for p in args.paths] or list(note_files(vault))
+    errors = warnings = checked = 0
     for path in paths:
         try:
             rel = path.relative_to(vault)
         except ValueError:
             rel = None
         shown = rel.as_posix() if rel else str(path)
+        if rel and (rel.as_posix() == PROFILE or rel.parts[0] == "templates"):
+            print(f"{shown}: skipped: not a note")
+            continue
+        checked += 1
         try:
             report = validate(read_note(path), rel)
         except (OSError, NoteError) as e:
@@ -341,7 +372,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             print(f"{shown}: warn: {w}")
         errors += len(report.errors)
         warnings += len(report.warnings)
-    print(f"{len(paths)} note(s), {errors} error(s), {warnings} warning(s)")
+    print(f"{checked} note(s), {errors} error(s), {warnings} warning(s)")
     return 1 if errors else 0
 
 
@@ -360,6 +391,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("init", help="create the vault structure; never overwrites files")
     p.add_argument("path", nargs="?", help="vault folder (default: the configured one)")
     p.add_argument("--name", help=f"knowledge base name (default: default_kb or {DEFAULT_KB!r})")
+    p.add_argument("--new-profile", action="store_true",
+                   help="create an empty learning_profile.md if it is missing in a vault already in use")
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("doctor", help="check the configuration and the vault")

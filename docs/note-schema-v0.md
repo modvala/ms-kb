@@ -103,7 +103,7 @@ updates:
 
 ## 5. Learning profile
 
-`learning_profile.md` is a short file (target: under ~150 lines) with links to detailed notes. It has no `type` and is not validated as a note.
+`learning_profile.md` is a short file (target: under ~150 lines) with links to detailed notes. It has no `type` and is not validated as a note. It is **user data**: `kb init` creates it only for a new vault and never silently recreates it on a vault in use (design §12.4); `kb init --new-profile` starts an empty one on request.
 
 ```markdown
 ---
@@ -185,4 +185,4 @@ Warnings:
 ## 8. Document history
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
-- **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from.
+- **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from; the learning profile is user data (§5).

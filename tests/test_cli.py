@@ -117,6 +117,46 @@ def test_doctor_incomplete_vault(tmp_path, capsys):
     assert "README.md" in capsys.readouterr().out
 
 
+def test_lost_profile_is_not_silently_recreated(tmp_path, capsys):
+    vault = setup_vault(tmp_path)
+    (vault / "learning_profile.md").unlink()
+    capsys.readouterr()
+    assert main(["doctor"]) == 1
+    assert "learning_profile.md is missing (user data: restore it from a backup" in capsys.readouterr().out
+
+    assert main(["init"]) == 0
+    assert "missing  learning_profile.md (user data" in capsys.readouterr().out
+    assert not (vault / "learning_profile.md").exists()
+    setup_vault(tmp_path)
+    assert not (vault / "learning_profile.md").exists()
+
+    assert main(["init", "--new-profile"]) == 0
+    assert (vault / "learning_profile.md").is_file()
+    assert main(["doctor"]) == 0
+
+
+def test_init_existing_vault_with_notes_does_not_add_profile(tmp_path):
+    vault = tmp_path / "existing"
+    (vault / "concepts").mkdir(parents=True)
+    (vault / "concepts" / "RAG.md").write_text("mine")
+    assert main(["init", str(vault)]) == 0
+    assert not (vault / "learning_profile.md").exists()
+
+
+def test_setup_new_vault_path_creates_profile(tmp_path):
+    setup_vault(tmp_path)
+    other = tmp_path / "other"
+    assert main(["setup", "--vault", str(other), "--yes", "--no-skills"]) == 0
+    assert (other / "learning_profile.md").is_file()
+
+
+def test_extend_missing_profile_points_to_doctor(tmp_path, capsys):
+    vault = setup_vault(tmp_path)
+    (vault / "learning_profile.md").unlink()
+    assert main(["extend", "learning_profile.md", "--topic", "x"]) == 1
+    assert "kb doctor" in capsys.readouterr().err
+
+
 def test_doctor_warns_about_git(tmp_path, capsys):
     (tmp_path / ".git").mkdir()
     setup_vault(tmp_path)

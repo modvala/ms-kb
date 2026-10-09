@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from ms_kb.vault import NOTE_TEMPLATES, VAULT_DIRS, check_vault, git_work_tree, init_vault
+from ms_kb.vault import NOTE_TEMPLATES, VAULT_DIRS, check_vault, git_work_tree, has_notes, init_vault
 
 # note-schema-v0 §1–§2
 COMMON_FIELDS = {"type", "title", "created", "updated", "topics"}
@@ -33,7 +33,7 @@ def test_fresh_init_creates_everything(tmp_path):
     assert (vault / "README.md").is_file()
     profile = (vault / "learning_profile.md").read_text()
     assert f'updated: "{date.today().isoformat()}"' in profile
-    assert check_vault(vault) == []
+    assert check_vault(vault) == ([], [])
 
 
 def test_second_init_changes_nothing(tmp_path):
@@ -55,7 +55,7 @@ def test_init_existing_folder_keeps_user_files(tmp_path):
     init_vault(vault)
     assert (vault / "concepts" / "RAG.md").read_text() == "mine"
     assert (vault / "notes.txt").read_text() == "other"
-    assert check_vault(vault) == []
+    assert check_vault(vault) == ([], [])
 
 
 def test_check_vault_reports_missing(tmp_path):
@@ -63,7 +63,22 @@ def test_check_vault_reports_missing(tmp_path):
     init_vault(vault)
     (vault / "learning_profile.md").unlink()
     (vault / "attachments").rmdir()
-    assert sorted(check_vault(vault)) == ["attachments/", "learning_profile.md"]
+    assert check_vault(vault) == (["attachments/"], ["learning_profile.md"])
+
+
+def test_init_without_user_files_reports_missing_profile(tmp_path):
+    vault = tmp_path / "vault"
+    report = dict(init_vault(vault, user_files=False))
+    assert report["learning_profile.md"] == "missing"
+    assert not (vault / "learning_profile.md").exists()
+    assert report["README.md"] == "created"
+
+
+def test_has_notes(tmp_path):
+    init_vault(tmp_path)
+    assert not has_notes(tmp_path)  # templates/ does not count
+    (tmp_path / "concepts" / "RAG.md").write_text("x")
+    assert has_notes(tmp_path)
 
 
 @pytest.mark.parametrize("note_type", NOTE_TEMPLATES)

@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.9"
+document_version: "1.10"
 created: "2026-10-05"
 updated: "2026-10-10"
 language: en
@@ -10,7 +10,7 @@ requirements_version: "1.9"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.9
+# Personal Knowledge System — Design & Contracts v1.10
 
 ## 1. Purpose and status
 
@@ -655,7 +655,7 @@ The index, if used, is derived state that can be rebuilt from the notes. Transfe
 | Regenerable | Folders, `templates/*.md`, `README.md` | `kb doctor` reports them; `kb init` recreates them |
 | User data | All notes and `learning_profile.md` (extended by `kb extend`) | Cannot be regenerated; restore only from history or a backup |
 
-`learning_profile.md` is currently created by `kb init` like a regenerable file. If it is deleted, `kb doctor` suggests `kb init`, which silently recreates an empty profile and hides the loss. It must be treated as user data: `kb doctor` points to a restore instead, and `kb init` recreates it only on a fresh vault or with an explicit flag. This is fixed in the current stage (roadmap stage 2), independently of the sync decision.
+`learning_profile.md` is currently created by `kb init` like a regenerable file. If it is deleted, `kb doctor` suggests `kb init`, which silently recreates an empty profile and hides the loss. It must be treated as user data: `kb doctor` points to a restore instead, and `kb init` recreates it only on a fresh vault or with an explicit flag. **Done in v1.10 (roadmap stage 2):** `kb init` and `kb setup` create the profile only for a new vault (not yet in the configuration and without notes); on a vault in use a missing profile is reported as `missing` with a restore hint, `kb doctor` reports it as an error pointing to a backup, and `kb init --new-profile` creates an empty one on request.
 
 Protection of user data in three layers:
 
@@ -686,7 +686,7 @@ Updating the package does not overwrite user Markdown files. Configuration chang
 | Learning profile | Brief context separate from detailed knowledge | Format and loading conditions |
 | Writing | Explicit skill invocation only; create/extend without duplication; the CLI writes notes and extends append-only; a plan is shown before existing notes are extended | — |
 | Synchronization | Local vault; cloud copy in Google Drive as a separate step; GitHub excluded for the vault (under reconsideration, §12.3) | Git + private GitHub vs Google Drive vs both (§12.3); how sync is triggered; mobile access (deferred); note change history |
-| Data integrity | The CLI never deletes and extends append-only | Regenerable vs user-data files, detection of deleted notes, restore (§12.4) |
+| Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated (§12.4) | Detection of deleted notes, restore (§12.4) |
 | ChatGPT | Out of scope at this stage | Possible future paths — §12.2 |
 | Maintenance | Versions and CI | Release process, migrations, whether CD is needed |
 
@@ -704,3 +704,4 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.7 — 2026-10-09:** roadmap stage 0: note schema, vault structure and configuration moved to `note-schema-v0.md`, client paths to `clients-v0.md`. Decided: `insight` is not a type (§5.1), `skill_ref` points to the release tag (§7), configuration is TOML (§14). Updated §4.1, §6.1, §14.
 - **1.8 — 2026-10-09:** roadmap stage 2: the CLI writes notes (`kb new`, append-only `kb extend`), the skill passes content (§9.1); a plan is shown before extending existing notes (§11). Updated §14.
 - **1.9 — 2026-10-10:** for further consideration: §12.3 — Git with a private GitHub repository as the vault's history and backup (revises the v1.2 exclusion of GitHub; not decided); §12.4 — data integrity: regenerable vs user-data files, `learning_profile.md` as user data, detection and recovery of deleted notes. Updated §12, §14.
+- **1.10 — 2026-10-10:** §12.4: regenerable vs user-data files implemented for `learning_profile.md` (roadmap stage 2). Updated §14.

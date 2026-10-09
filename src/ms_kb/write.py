@@ -139,6 +139,8 @@ def resolve_in_vault(vault: Path, path: str) -> Path:
     if not target.is_relative_to(vault.resolve()):
         raise WriteError([f"{path} is outside the vault {vault}"])
     if not target.is_file():
+        if target == (vault / PROFILE).resolve():
+            raise WriteError([f"{PROFILE} is missing; run kb doctor to see how to restore it"])
         raise WriteError([f"{path} not found in the vault; find notes with kb search"])
     return target
 

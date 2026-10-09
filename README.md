@@ -18,7 +18,7 @@ kb doctor     # checks the configuration and the vault
 kb where      # prints the vault path
 ```
 
-`kb setup` also installs the `add-knowledge` skill into the chosen clients (`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex; Cursor reads both). Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder.
+`kb setup` also installs the `add-knowledge` skill into the chosen clients (`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex; Cursor reads both). Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder. `learning_profile.md` is your data: if it disappears from a vault in use, `kb init` does not recreate it and `kb doctor` suggests restoring it from a backup; `kb init --new-profile` starts an empty one.
 
 ## Saving knowledge
 

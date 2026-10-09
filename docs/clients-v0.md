@@ -59,7 +59,23 @@ The probe skill `kb-hello` was placed in `~/.claude/skills/kb-hello/` and `~/.ag
 
 Result: each of the two install directories is read by exactly one of the two clients, so Claude Code and Codex get one copy each. The probe copies were deleted after the check.
 
-## 4. Portable `SKILL.md` v0
+## 4. Hands-on check (stage 2)
+
+`add-knowledge` 0.3.0 was installed with `kb setup` and run on a real learning conversation.
+
+| Check | Claude Code | Codex | Cursor |
+|---|---|---|---|
+| `/add-knowledge` found and invoked | yes (desktop Code tab, 2026-10-10) | pending | pending (not installed) |
+| First run: session + concepts created, no plan shown | yes: 1 session, 2 concepts, profile extended | pending | pending |
+| Repeat run on the same topic: plan shown, existing concepts extended, no duplicates | yes: plan confirmed, 2 concepts extended, 1 new session and 1 new concept | pending | pending |
+| `agent` in provenance | `claude-code` (from `CLAUDECODE=1`) | pending | pending |
+| Skill sees duplicates | no | pending | pending |
+
+Codex and Cursor are checked later, together with the other skills, in roadmap stage 5.
+
+Found and fixed during the check: `kb validate` took paths relative to the current folder instead of the vault, and checked `learning_profile.md` as a note.
+
+## 5. Portable `SKILL.md` v0
 
 Every skill shipped by the package follows these rules, so one file works in all three clients:
 
@@ -79,7 +95,7 @@ metadata:
 - The skill finds the vault only by calling `kb` (for example `kb where`, `kb search`), never from the current working folder or by reading the configuration file.
 - Supporting files go in `references/` and are linked by relative path.
 
-## 5. Document history
+## 6. Document history
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
-- **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6).
+- **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6); hands-on results of `add-knowledge` (§4).
