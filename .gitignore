@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+# Personal knowledge never goes into the repository
+vault/
+*.vault/
