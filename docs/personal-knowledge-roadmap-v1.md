@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.1"
+document_version: "1.2"
 created: "2026-10-09"
 language: en
 status: draft
 requirements_ref: "personal-knowledge-user-stories-v1.md"
-requirements_version: "1.7"
+requirements_version: "1.8"
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.6"
+design_version: "1.7"
 ---
 
-# Personal Knowledge System — Roadmap v1.1
+# Personal Knowledge System — Roadmap v1.2
 
 ## 1. Purpose
 
@@ -24,7 +24,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 
 | Stage | Version | Status | Result | Key US |
 |---|---|---|---|---|
-| 0. Skeleton and checks | v0.1 | ⬜ Not done | Package installs from GitHub, `kb --version` works; skills directories verified in all three clients; note schema approved | US-04, US-17, US-23 |
+| 0. Skeleton and checks | v0.1 | ✅ Done | Package installs from GitHub, `kb --version` works; skills directories verified in all three clients; note schema approved | US-04, US-17, US-23 |
 | 1. Knowledge base | v0.2 | ⬜ Not done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ⬜ Not done | Conversation outcomes are saved to the knowledge base in all three clients, with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
 | 3. Reading: `kb-recall` | v0.4 | ⬜ Not done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
@@ -40,7 +40,7 @@ Stages 2 and 3 are the core of the value. Stages 0–1 prepare for them; stages 
 
 ### Stage 0. Skeleton and checks → v0.1
 
-**Status:** ⬜ Not done
+**Status:** ✅ Done (v0.1.0, 2026-10-09). Results: [note-schema-v0.md](note-schema-v0.md), [clients-v0.md](clients-v0.md); Cursor is checked hands-on in stage 2.
 
 **Goal:** remove technical unknowns before writing the main logic.
 
@@ -165,3 +165,4 @@ The order is approximate: items at the top are closer to the current value.
 
 - **1.0 — 2026-10-09:** first version of the roadmap, based on user stories v1.7 and design v1.6.
 - **1.1 — 2026-10-09:** added a completion status for each stage (in the overview table and in each stage section).
+- **1.2 — 2026-10-09:** stage 0 done: package `v0.1.0` installs from GitHub, note schema and client paths recorded; references updated to user stories 1.8 and design 1.7.
