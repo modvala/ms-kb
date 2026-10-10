@@ -39,3 +39,27 @@ def vault(tmp_path):
     path = tmp_path / "vault"
     assert main(["setup", "--vault", str(path), "--clients", "claude-code,codex", "--yes"]) == 0
     return path.resolve()
+
+
+@pytest.fixture(autouse=True)
+def fake_launchd(monkeypatch):
+    """Record launchctl calls instead of touching the real launchd; no Time Machine lookups."""
+    import subprocess
+
+    from ms_kb import schedule
+
+    calls = []
+    loaded = set()
+
+    def launchctl(*args):
+        calls.append(args)
+        if args[0] == "bootstrap":
+            loaded.add(schedule.LABEL)
+        elif args[0] == "bootout":
+            loaded.discard(schedule.LABEL)
+        code = 0 if args[0] != "print" or schedule.LABEL in loaded else 113
+        return subprocess.CompletedProcess(["launchctl", *args], code, "", "")
+
+    monkeypatch.setattr(schedule, "launchctl", launchctl)
+    monkeypatch.setattr(schedule, "time_machine_latest", lambda: None)
+    return calls

@@ -9,6 +9,7 @@ import tomli_w
 
 SCHEMA_VERSION = 1
 KNOWN_CLIENTS = ("claude-code", "codex", "cursor")
+SYNC_PROVIDERS = ("git",)
 
 
 class ConfigError(Exception):
@@ -16,8 +17,17 @@ class ConfigError(Exception):
 
 
 @dataclass
+class SyncConfig:
+    """Off-machine copy of the vault (design §12.3): a remote of its own Git repository."""
+
+    provider: str = "git"
+    remote: str = "origin"
+
+
+@dataclass
 class KbConfig:
     vault_path: str
+    sync: SyncConfig | None = None
 
     @property
     def vault(self) -> Path:
@@ -64,7 +74,13 @@ def load_config(path: Path | None = None) -> Config | None:
     for name, kb in data.get("kbs", {}).items():
         if "vault_path" not in kb:
             raise ConfigError(f"{path}: [kbs.{name}] has no vault_path")
-        kbs[name] = KbConfig(vault_path=kb["vault_path"])
+        sync = None
+        if "sync" in kb:
+            sync = SyncConfig(**{k: kb["sync"][k] for k in ("provider", "remote") if k in kb["sync"]})
+            if sync.provider not in SYNC_PROVIDERS:
+                raise ConfigError(f"{path}: [kbs.{name}.sync] provider {sync.provider!r} is not supported "
+                                  f"(supported: {', '.join(SYNC_PROVIDERS)})")
+        kbs[name] = KbConfig(vault_path=kb["vault_path"], sync=sync)
 
     return Config(
         default_kb=data["default_kb"],
@@ -74,12 +90,19 @@ def load_config(path: Path | None = None) -> Config | None:
     )
 
 
+def _kb_data(kb: KbConfig) -> dict:
+    data = {"vault_path": kb.vault_path}
+    if kb.sync is not None:
+        data["sync"] = {"provider": kb.sync.provider, "remote": kb.sync.remote}
+    return data
+
+
 def save_config(cfg: Config, path: Path | None = None) -> Path:
     path = path or config_path()
     data = {
         "schema_version": cfg.schema_version,
         "default_kb": cfg.default_kb,
-        "kbs": {name: {"vault_path": kb.vault_path} for name, kb in cfg.kbs.items()},
+        "kbs": {name: _kb_data(kb) for name, kb in cfg.kbs.items()},
         "clients": {"enabled": cfg.clients},
     }
     path.parent.mkdir(parents=True, exist_ok=True)

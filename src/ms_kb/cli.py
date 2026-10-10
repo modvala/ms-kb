@@ -2,7 +2,7 @@ import argparse
 import difflib
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ms_kb import __version__
@@ -12,6 +12,7 @@ from ms_kb.config import (
     Config,
     ConfigError,
     KbConfig,
+    SyncConfig,
     config_path,
     load_config,
     save_config,
@@ -21,7 +22,7 @@ from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills
 from ms_kb.instructions import check_instructions, install_instructions, instruction_text
-from ms_kb import history, integrity, vaultstate
+from ms_kb import history, integrity, schedule, vaultstate
 from ms_kb.history import GitError
 from ms_kb.provenance import trailers
 from ms_kb.secretscan import find_secrets
@@ -82,7 +83,7 @@ PROFILE_HINT = (
 
 def _init_kb(
     cfg: Config | None, name: str, vault: str, clients: list[str] | None = None, new_profile: bool = False
-) -> None:
+) -> Config:
     """Create the vault structure and record it in the configuration.
 
     The learning profile is user data: it is created on a new vault (not yet
@@ -98,10 +99,13 @@ def _init_kb(
     _init_history(path.resolve())
     if cfg is None:
         cfg = Config(default_kb=name)
-    cfg.kbs[name] = KbConfig(vault_path=vault)
+    old = cfg.kbs.get(name)
+    sync = old.sync if old and _same_path(old.vault_path, vault) else None
+    cfg.kbs[name] = KbConfig(vault_path=vault, sync=sync)
     if clients is not None:
         cfg.clients = clients
     print(f"Configuration: {save_config(cfg)}")
+    return cfg
 
 
 def _report_excluded(excluded: list[tuple[str, str]], level: str = "warning") -> None:
@@ -144,10 +148,57 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def _ask(prompt: str, default: str) -> str:
     try:
-        answer = input(f"{prompt} [{default}]: ").strip()
+        answer = input(f"{prompt} [{default}]: " if default else f"{prompt}: ").strip()
     except EOFError:
         answer = ""
     return answer or default
+
+
+def _confirm(prompt: str, default: bool) -> bool:
+    answer = _ask(f"{prompt} ({'Y/n' if default else 'y/N'})", "").lower()
+    return default if not answer else answer.startswith("y")
+
+
+def _setup_copy(cfg: Config, name: str, args: argparse.Namespace) -> int:
+    """The off-machine copy (design §12.3): the remote and the hourly schedule."""
+    kb = cfg.kbs[name]
+    vault = kb.vault.resolve()
+    if history.repo_status(vault)[0] != "own":
+        print("Off-machine copy: skipped (the vault has no Git repository of its own)")
+        return 0
+    remote = kb.sync.remote if kb.sync else "origin"
+    current = history.remote_url(vault, remote)
+    url = args.remote
+    if url is None and not args.no_remote and not args.yes:
+        url = _ask("Remote URL for an off-machine copy, a private repository (empty to skip)", current or "")
+    if url and not args.no_remote:
+        if url != current:
+            history.set_remote(vault, remote, url)
+        if kb.sync is None:
+            kb.sync = SyncConfig(remote=remote)
+            save_config(cfg)
+        print(f"Off-machine copy: {remote} -> {url} (push with kb sync)")
+    elif kb.sync:
+        print(f"Off-machine copy: {remote} -> {current or '(remote not set in the vault repository)'}")
+    else:
+        print("Off-machine copy: none (set a private remote later with kb setup --remote URL)")
+
+    if kb.sync is None or not schedule.supported():
+        return 0
+    want = args.schedule
+    if want is None and not args.yes:
+        want = _confirm("Run kb sync hourly in the background (a LaunchAgent)?", True)
+    try:
+        if want:
+            for line in schedule.install():
+                print(f"Schedule: {line}")
+        elif want is False and schedule.installed():
+            for line in schedule.remove():
+                print(f"Schedule: {line}")
+    except (RuntimeError, OSError) as e:
+        _warn(f"schedule: {e}")
+        return 1
+    return 0
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
@@ -174,7 +225,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
         print(f"Note: {name!r} now points to {vault}; the old vault {current.vault_path} is left untouched.")
 
     print(f"Vault {name!r}: {Path(vault).expanduser()}")
-    _init_kb(cfg, name, vault, clients)
+    cfg = _init_kb(cfg, name, vault, clients)
+    copy_errors = _setup_copy(cfg, name, args)
 
     print()
     print(f"Clients: {', '.join(clients) or 'none'}")
@@ -186,7 +238,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     print("Next steps:")
     print(f"  - Obsidian: Open folder as vault -> {Path(vault).expanduser()}")
     print("  - Check the setup: kb doctor")
-    return 1 if errors else 0
+    return 1 if errors or copy_errors else 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -242,6 +294,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         else:
             report("error", "history: git not found; install it with xcode-select --install")
         _doctor_integrity(cfg.default_kb, vault.resolve(), args.ack, report)
+        if status == "own":
+            _doctor_copy(cfg.default_kb, vault.resolve(), kb, report)
 
     unknown = [c for c in cfg.clients if c not in KNOWN_CLIENTS]
     if unknown:
@@ -273,6 +327,105 @@ def _doctor_integrity(name: str, vault: Path, ack: list[str], report) -> None:
     if not any(f.level == "error" for f in findings):
         state = vaultstate.load(name)
         report("ok", f"integrity: {len(state['notes'])} notes tracked, none deleted or damaged")
+
+
+STALE_PUSH_HOURS = 24
+
+
+def _age_hours(stamp: str | None) -> float | None:
+    if not stamp:
+        return None
+    return (datetime.now(timezone.utc) - datetime.fromisoformat(stamp)).total_seconds() / 3600
+
+
+def _doctor_copy(name: str, vault: Path, kb: KbConfig, report) -> None:
+    """Freshness of history and of the off-machine copy (design §12.4)."""
+    git_state = vaultstate.load(name)["git"]
+    if pending := history.pending(vault):
+        report("info", f"{len(pending)} file(s) changed outside kb; committed on the next write or kb sync")
+    if error := git_state.get("last_error"):
+        report("warn", f"last Git error ({git_state.get('last_error_at', '?')}): {error}")
+    if kb.sync is None:
+        report("warn", "no off-machine copy: set a private remote with kb setup --remote URL")
+    elif (url := history.remote_url(vault, kb.sync.remote)) is None:
+        report("error", f"remote {kb.sync.remote!r} is not set in the vault repository; run kb setup --remote URL")
+    else:
+        last = git_state.get("last_push")
+        count = history.unpushed(vault, kb.sync.remote)
+        age = _age_hours(last)
+        when = f"last push {last}" if last else "never pushed"
+        if count and (age is None or age > STALE_PUSH_HOURS):
+            report("warn", f"{count} commit(s) not pushed to {url}, {when}; run kb sync")
+        elif count:
+            report("info", f"{count} commit(s) waiting for the next kb sync to {url}")
+        else:
+            report("ok", f"remote {kb.sync.remote} ({url}) up to date, {when}")
+        if schedule.supported():
+            if not schedule.installed():
+                report("warn", "hourly kb sync is not scheduled; run kb sync --schedule on")
+            elif not schedule.loaded():
+                report("warn", "the kb sync LaunchAgent is not loaded; run kb sync --schedule on")
+            else:
+                report("ok", "hourly kb sync scheduled")
+    if schedule.supported():
+        latest = schedule.time_machine_latest()
+        report("info", f"Time Machine: {f'last backup {latest}' if latest else 'last backup unknown'}")
+
+
+def cmd_sync(args: argparse.Namespace) -> int:
+    if args.schedule:
+        return _cmd_schedule(args.schedule)
+    name, vault, kb = _kb()
+
+    def say(message: str) -> None:
+        if not args.quiet:
+            print(message)
+
+    def problem(message: str) -> None:
+        stamp = f"{vaultstate.now()} " if args.quiet else ""
+        print(f"{stamp}kb sync: error: {message}", file=sys.stderr)
+
+    if history.repo_status(vault)[0] != "own":
+        problem("the vault has no Git repository of its own; run kb init")
+        return 1
+    failed = False
+    with vaultstate.lock(name):
+        state = vaultstate.load(name)
+        try:
+            commit = history.commit_external(vault)
+        except GitError as e:
+            problem(str(e))
+            vaultstate.git_failed(state, str(e))
+            vaultstate.save(name, state)
+            return 1
+        if commit.committed:
+            vaultstate.git_ok(state, "last_commit", commit.rev)
+            say(f"committed {len(commit.files)} file(s) changed outside kb ({commit.rev})")
+        for rel, reason in commit.excluded:
+            problem(f"not committed, so not pushed: {rel}: {reason}")
+            failed = True
+        if kb.sync is None:
+            say("no remote configured; set a private remote with kb setup --remote URL")
+        else:
+            try:
+                say(history.push(vault, kb.sync.remote))
+                vaultstate.git_ok(state, "last_push")
+            except GitError as e:
+                problem(f"{e}; local commits are kept for the next kb sync")
+                vaultstate.git_failed(state, str(e))
+                failed = True
+        vaultstate.save(name, state)
+    return 1 if failed else 0
+
+
+def _cmd_schedule(action: str) -> int:
+    try:
+        lines = {"on": schedule.install, "off": schedule.remove, "status": schedule.status}[action]()
+    except (RuntimeError, OSError) as e:
+        return _error(str(e))
+    for line in lines:
+        print(line)
+    return 0
 
 
 def cmd_where(args: argparse.Namespace) -> int:
@@ -607,6 +760,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="do not install skills or the global instruction into the clients")
     p.add_argument("--no-instructions", action="store_true",
                    help="do not add the ms-kb block to ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md")
+    p.add_argument("--remote", metavar="URL", help="a private Git repository that kb sync pushes the vault to")
+    p.add_argument("--no-remote", action="store_true", help="do not ask for a remote")
+    p.add_argument("--schedule", action=argparse.BooleanOptionalAction, default=None,
+                   help="run kb sync hourly with a LaunchAgent (macOS; asked when a remote is set)")
     p.set_defaults(func=cmd_setup)
 
     p = sub.add_parser("init", help="create the vault structure; never overwrites files")
@@ -686,6 +843,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deleted", action="store_true", help="only commits that deleted files")
     p.add_argument("--limit", type=int, default=20, help="maximum commits (default 20, 0 = all)")
     p.set_defaults(func=cmd_history)
+
+    p = sub.add_parser("sync", help="commit outside edits and push the vault to its private remote")
+    p.add_argument("--quiet", action="store_true", help="print only problems (used by the LaunchAgent)")
+    p.add_argument("--schedule", choices=("on", "off", "status"),
+                   help="install, remove or show the hourly LaunchAgent instead of syncing")
+    p.set_defaults(func=cmd_sync)
 
     p = sub.add_parser("restore", help="bring a note back from the vault's history; never overwrites silently")
     p.add_argument("path", help="vault-relative path, as kb doctor or kb history --deleted print it")

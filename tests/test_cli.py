@@ -46,12 +46,13 @@ def test_setup_rejects_unknown_client(tmp_path):
 
 
 def test_setup_prompts(tmp_path, monkeypatch):
-    answers = iter([str(tmp_path / "prompted"), "cursor"])
+    answers = iter([str(tmp_path / "prompted"), "cursor", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     assert main(["setup"]) == 0
     cfg = load_config()
     assert cfg.default().vault == (tmp_path / "prompted").resolve()
     assert cfg.clients == ["cursor"]
+    assert cfg.default().sync is None
 
 
 def test_setup_again_is_safe(tmp_path):
