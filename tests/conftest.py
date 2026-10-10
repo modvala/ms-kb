@@ -11,11 +11,12 @@ def isolated_config(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
-    """Never touch the real ~/.claude, ~/.agents or ~/.cursor during tests."""
+    """Never touch the real ~/.claude, ~/.agents, ~/.codex or ~/.cursor during tests."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.delenv("CODEX_HOME", raising=False)
     return home
 
 

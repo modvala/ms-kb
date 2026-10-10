@@ -11,7 +11,7 @@ def skill_dir(home, client_dir, name="add-knowledge"):
 
 
 def test_bundled_skills():
-    assert "add-knowledge" in bundled_skills()
+    assert bundled_skills() == ["add-knowledge", "kb-recall"]
 
 
 def test_target_dirs(isolated_home):
@@ -28,10 +28,13 @@ def test_setup_installs_skills(vault, isolated_home):
         assert meta["name"] == "add-knowledge"
         assert meta["metadata"]["package_version"] == __version__
         assert (skill_dir(isolated_home, d) / "references" / "note-types.md").is_file()
-    state = tomllib.loads(installed_path().read_text())["skills"]["add-knowledge"]
-    assert state["version"] == "0.3.0"
-    assert state["package_version"] == __version__
-    assert state["targets"] == ["~/.claude/skills/add-knowledge", "~/.agents/skills/add-knowledge"]
+    skills = tomllib.loads(installed_path().read_text())["skills"]
+    for name in ("add-knowledge", "kb-recall"):
+        state = skills[name]
+        assert state["version"] == "0.4.0"
+        assert state["package_version"] == __version__
+        assert state["targets"] == [f"~/.claude/skills/{name}", f"~/.agents/skills/{name}"]
+        assert read_note(skill_dir(isolated_home, ".claude", name) / "SKILL.md").meta["name"] == name
 
 
 def test_setup_no_skills(tmp_path, isolated_home):

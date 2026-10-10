@@ -1,14 +1,14 @@
 ---
 title: "Personal Knowledge System — User Stories"
-document_version: "1.9"
+document_version: "1.10"
 created: "2026-10-05"
-updated: "2026-10-09"
+updated: "2026-10-10"
 language: en
 status: requirements_baseline
 origin: "Decisions from discussions with the user, consolidated into user stories"
 ---
 
-# Personal Knowledge System — User Stories v1.9
+# Personal Knowledge System — User Stories v1.10
 
 This document records the desired outcome and the decisions made about the personal knowledge base. It does not mean that integrations are already connected or that the system has been implemented. Acceptance criteria turn agreements into verifiable behavior; specific tools and unresolved questions are listed separately.
 
@@ -153,7 +153,7 @@ Acceptance criteria:
 - It stays brief and links to detailed notes.
 - Detailed knowledge is retrieved on demand rather than kept in the profile permanently.
 - The profile reflects recorded information; assumptions about what I have understood are not presented as a confirmed result.
-- How the profile is connected to each agent is still to be chosen: automatic loading is not assumed by default.
+- The profile is not loaded automatically: the `kb-recall` skill reads it on demand, when a request needs personal learning context (decided in v1.10, design §10).
 
 ### US-10. Saving and updating learning outcomes
 
@@ -408,14 +408,14 @@ These items are not considered accepted technical decisions:
 
 1. The specific local path to the separate vault. Local storage separate from the library and direct file access from Claude Code/Codex/Cursor are accepted for the MVP.
 2. Whether an Obsidian integration/MCP is needed after the MVP (for remote clients or search); its actual search, read and write capabilities.
-3. Retrieval for the first implementation: text, semantic or hybrid search; the model and indexing method if needed.
+3. ~~Retrieval for the first implementation~~ — decided in v1.10: text and metadata search via `kb search`, no index (US-08). Open: semantic or hybrid search after the MVP, the model and indexing method.
 4. ~~Folder structure and metadata schema~~ — decided in v1.8: [note-schema-v0.md](note-schema-v0.md). Open: the source registry format.
-5. The minimal set of skills besides `add-knowledge` and how entry instructions are connected to each client.
+5. ~~The minimal set of skills and entry instructions~~ — decided in v1.10: `add-knowledge` and `kb-recall`; the global instruction is a marked block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, pasted by hand into Cursor User Rules ([clients-v0.md](clients-v0.md) §2). Open: further skills (backlog).
 6. ~~Write policy~~ — decided in v1.3: only on explicit skill invocation (US-24). ~~Plan before editing~~ — decided in v1.9: new notes are created right away; before existing notes are extended, the agent shows a plan and waits for confirmation (design §11).
 7. Storage of note history, exact skill versions and provenance changes.
 8. ~~MVP scope~~ — decided in v1.3 (see "MVP decisions"). Open: the order in which additional sources are connected.
 9. ~~Language and package manager~~ — decided in v1.3: Python + `uv`, installation from GitHub. ~~Install/update scheme~~ — decided in v1.5: `uv tool install` + `setup`, updating in a single command. Open: final command names.
-10. ~~User skills directories~~ — decided in v1.8: [clients-v0.md](clients-v0.md). Open: how Cursor handles duplicate skills and how to deliver the global instruction to Cursor.
+10. ~~User skills directories~~ — decided in v1.8: [clients-v0.md](clients-v0.md). Open: how Cursor handles duplicate skills.
 11. ~~Sync provider~~ — decided: not GitHub (v1.4), Google Drive (v1.5), local vault, sync as a separate step (v1.6). Open: the mechanism (`rclone` is recommended), how it is triggered, phone access (deferred), note change history.
 14. Connecting ChatGPT — outside the current scope; revisit after the MVP (options are in design §12.2).
 12. ~~Configuration format~~ — decided in v1.8: TOML at `~/.config/ms-kb/config.toml`; skills find the vault by calling the `kb` CLI ([note-schema-v0.md](note-schema-v0.md) §6).
@@ -452,3 +452,4 @@ The knowledge base is convenient to read and extend both directly and through co
 - **1.7 — 2026-10-09:** ChatGPT excluded from scope at this stage; the cloud inbox and pulling materials during sync removed. Updated "MVP decisions", US-18, US-20, US-24, open question 14.
 - **1.8 — 2026-10-09:** roadmap stage 0: open questions 4, 10 and 12 decided with links to `note-schema-v0.md` and `clients-v0.md`.
 - **1.9 — 2026-10-09:** roadmap stage 2: open question 6 decided (a plan before extending existing notes).
+- **1.10 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (US-09); open questions 3, 5 and 10 decided for the MVP (text and metadata search, the `kb-recall` skill, the global instruction per client).

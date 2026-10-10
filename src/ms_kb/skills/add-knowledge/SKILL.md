@@ -7,7 +7,7 @@ description: >-
   Use only when the user explicitly asks to save, record or add what was learned
   to the knowledge base, or invokes add-knowledge; never on your own initiative.
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   package: ms-kb
 ---
 
@@ -139,16 +139,20 @@ Rules:
 
 ## 8. Learning profile
 
-Add the session to the profile:
+The profile is the short entry point that `kb-recall` reads first. Add the session to it, and add every concept **created** in this run (not extended) to `## Known topics`:
 
 ```bash
 kb extend learning_profile.md --body-file - <<'EOF'
 ## Recently studied
 - <YYYY-MM-DD> — [[<session file name>]]
+## Known topics
+- [[<New concept>]] — <one line: what it covers>
 ## Open questions
 - <question> — from [[<session file name>]]
 EOF
 ```
+
+Leave out `## Known topics` if no concept was created. Keep each line short: the profile links to notes and does not repeat them.
 
 ## 9. Report
 

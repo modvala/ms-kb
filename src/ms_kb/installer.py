@@ -59,17 +59,28 @@ def installed_path() -> Path:
     return config_path().parent / "installed.toml"
 
 
-def load_installed() -> dict[str, dict]:
+def load_state() -> dict:
+    """The whole installed.toml: `skills` and `instructions` tables."""
     path = installed_path()
     if not path.exists():
         return {}
-    return tomllib.loads(path.read_text(encoding="utf-8")).get("skills", {})
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def save_state(state: dict) -> None:
+    path = installed_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(tomli_w.dumps(state), encoding="utf-8")
+
+
+def load_installed() -> dict[str, dict]:
+    return load_state().get("skills", {})
 
 
 def save_installed(skills: dict[str, dict]) -> None:
-    path = installed_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(tomli_w.dumps({"skills": skills}), encoding="utf-8")
+    state = load_state()
+    state["skills"] = skills
+    save_state(state)
 
 
 def display(path: Path) -> str:

@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.10"
+document_version: "1.11"
 created: "2026-10-05"
 updated: "2026-10-10"
 language: en
 status: discussion_baseline
 requirements_ref: "personal-knowledge-user-stories-v1.md"
-requirements_version: "1.9"
+requirements_version: "1.10"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.10
+# Personal Knowledge System — Design & Contracts v1.11
 
 ## 1. Purpose and status
 
@@ -483,7 +483,7 @@ The solution is built on **skills + CLI**. MCP, subagents and hooks are not used
 |---|---|---|
 | Core: Python library + `kb` CLI | Locating the vault via configuration, search by frontmatter and text, creating/extending notes from templates, **stamping provenance** (skill, version, date), schema validation, duplicate detection, skills installation, synchronization | Yes |
 | Skills (`SKILL.md`) | Summarizing the conversation, classifying by type, the "create or extend" decision, wording the text, marking confirmed vs. assumed | Yes: `add-knowledge`, `kb-recall` |
-| Global instruction (`AGENTS.md` / `CLAUDE.md` / Cursor user rules) | A short pointer telling the agent that the knowledge base exists and which skills apply | Yes, installed via `kb setup` |
+| Global instruction (`AGENTS.md` / `CLAUDE.md` / Cursor user rules) | A short pointer telling the agent that the knowledge base exists and which skills apply | Yes: a block between `<!-- ms-kb:begin/end -->` markers in `~/.claude/CLAUDE.md` and `$CODEX_HOME/AGENTS.md`, written by `kb setup` / `kb install-skills`; for Cursor the text is printed to paste into User Rules (v1.11, [clients-v0.md](clients-v0.md) §2) |
 | MCP server | The same core operations as typed tools for clients without a shell (ChatGPT, phone, remote agents) | No; a thin wrapper over the core later |
 | Subagents | A "librarian" (searching a large vault and returning only the needed fragments), parallel reading of sources for `research` | No; an optional improvement for clients that support them |
 | Hooks | For example, a "save knowledge?" reminder before context compaction (PreCompact in Claude Code); automatic writing is not allowed | No; an optional improvement |
@@ -511,7 +511,7 @@ Important constraints:
 | "What's the application status and what did we decide about the strategy?" | Status from Notion plus knowledge/conclusions from Obsidian |
 | "What is 15 × 18?" | No additional KB search is needed |
 
-The learning profile is a small context with current directions, known topics, recently studied material and open questions. It links to detailed notes and does not replace them. How the profile is loaded (always or conditionally) is still being chosen.
+The learning profile is a small context with current directions, known topics, recently studied material and open questions. It links to detailed notes and does not replace them. **Decided in v1.11:** the profile is loaded **on demand** — the `kb-recall` skill reads it first when the request needs personal learning context; the global instruction only names the skills and does not load the profile, so a simple question reads nothing from the KB. `add-knowledge` fills it (recent sessions, new concepts, open questions); it stays append-only user data, and `kb doctor` warns when it grows past ~150 lines so the user trims it ([note-schema-v0.md](note-schema-v0.md) §5).
 
 Retrieval describes the process of extracting context and does not imply mandatory use of embeddings. Text/semantic/hybrid search and the specific backend for the first implementation are open. Third-party Obsidian plugins mentioned earlier were examples of possible implementations; none of them is chosen by this document.
 
@@ -680,10 +680,10 @@ Updating the package does not overwrite user Markdown files. Configuration chang
 | Configuration | Each knowledge base has its own source/storage settings; TOML at `~/.config/ms-kb/config.toml` ([note-schema-v0.md](note-schema-v0.md) §6) | Source registry format |
 | Markdown | Five types, metadata, links, attachments; fields and directory structure — [note-schema-v0.md](note-schema-v0.md); `insight` is not a type | — |
 | Provenance | Skill/version, sources, dates, exact rules via a link at the release tag; stamped by the CLI | Note content history |
-| Search | Selective retrieval instead of loading the whole vault | Text/semantic/hybrid, model and backend |
+| Search | Selective retrieval instead of loading the whole vault; MVP: text and metadata via `kb search`, no index, used by `kb-recall` (US-08) | Semantic/hybrid after the MVP, model and backend |
 | Access | Direct access to vault files from Claude Code/Codex/Cursor in the MVP; connectors to supporting sources | MCP for remote clients after the MVP |
-| Skills | Shipped with the package and the user scope; portable `SKILL.md` format and install directories — [clients-v0.md](clients-v0.md); the first skill is `add-knowledge` | The rest of the skills list; Cursor duplicates and global instruction |
-| Learning profile | Brief context separate from detailed knowledge | Format and loading conditions |
+| Skills | Shipped with the package and the user scope; portable `SKILL.md` format and install directories — [clients-v0.md](clients-v0.md); MVP skills `add-knowledge` and `kb-recall`; the global instruction as a marked block (§9.1) | Further skills (backlog); Cursor duplicates |
+| Learning profile | Brief context separate from detailed knowledge; format in [note-schema-v0.md](note-schema-v0.md) §5; loaded on demand by `kb-recall` (§10) | — |
 | Writing | Explicit skill invocation only; create/extend without duplication; the CLI writes notes and extends append-only; a plan is shown before existing notes are extended | — |
 | Synchronization | Local vault; cloud copy in Google Drive as a separate step; GitHub excluded for the vault (under reconsideration, §12.3) | Git + private GitHub vs Google Drive vs both (§12.3); how sync is triggered; mobile access (deferred); note change history |
 | Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated (§12.4) | Detection of deleted notes, restore (§12.4) |
@@ -705,3 +705,4 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.8 — 2026-10-09:** roadmap stage 2: the CLI writes notes (`kb new`, append-only `kb extend`), the skill passes content (§9.1); a plan is shown before extending existing notes (§11). Updated §14.
 - **1.9 — 2026-10-10:** for further consideration: §12.3 — Git with a private GitHub repository as the vault's history and backup (revises the v1.2 exclusion of GitHub; not decided); §12.4 — data integrity: regenerable vs user-data files, `learning_profile.md` as user data, detection and recovery of deleted notes. Updated §12, §14.
 - **1.10 — 2026-10-10:** §12.4: regenerable vs user-data files implemented for `learning_profile.md` (roadmap stage 2). Updated §14.
+- **1.11 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (§10); the global instruction is a marked block in `CLAUDE.md` / `AGENTS.md`, pasted by hand in Cursor (§9.1); MVP search is text and metadata. Updated §14.

@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Note Schema, Vault Structure and Configuration v0"
-document_version: "0.2"
+document_version: "0.3"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.7"
+design_version: "1.11"
 ---
 
 # Note schema, vault structure and configuration v0
@@ -126,7 +126,7 @@ updated: "2026-10-09"
 - How does reranking interact with chunk size? — from [[2026-10-09-rag-session]]
 ```
 
-How the profile is loaded (always or on demand) is decided in stage 3.
+The profile is loaded **on demand** (decided in stage 3, design §10): `kb-recall` reads it first to find the topics, recent sessions and open questions, then searches and reads only the notes it needs. Nothing loads it automatically. `add-knowledge` appends the session to `## Recently studied`, newly created concepts to `## Known topics` and open questions to `## Open questions`. The file stays append-only for `kb`; trimming it is up to the user, and `kb doctor` warns when it is longer than 150 lines.
 
 ## 6. User configuration
 
@@ -186,3 +186,4 @@ Warnings:
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
 - **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from; the learning profile is user data (§5).
+- **0.3 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall`, `## Known topics` is filled by `add-knowledge`, `kb doctor` warns above 150 lines (§5).

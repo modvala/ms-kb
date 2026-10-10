@@ -18,11 +18,13 @@ from ms_kb.notes import NOTE_TYPES, PROFILE, NoteError, read_note
 from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills
+from ms_kb.instructions import check_instructions, install_instructions, instruction_text
 from ms_kb.vault import check_vault, git_work_tree, has_notes, init_vault
 from ms_kb.write import WriteError, extend_note, new_note, save
 
 DEFAULT_KB = "main"
 DEFAULT_VAULT = "~/Knowledge/main"
+PROFILE_MAX_LINES = 150  # note-schema-v0 §5
 
 
 def _error(message: str) -> int:
@@ -152,7 +154,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if args.no_skills:
         print("Skills: not installed (--no-skills); run kb install-skills later")
     else:
-        errors = _install_skills(clients, force=False, dry_run=False)
+        errors = _install_skills(clients, force=False, dry_run=False, instructions=not args.no_instructions)
     print("Next steps:")
     print(f"  - Obsidian: Open folder as vault -> {Path(vault).expanduser()}")
     print("  - Check the setup: kb doctor")
@@ -196,6 +198,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             report("error", f"missing in vault: {', '.join(missing)}; run kb init")
         for rel in lost:
             report("error", f"{rel} is missing ({PROFILE_HINT})")
+        profile = vault / PROFILE
+        if profile.is_file() and (n := len(profile.read_text(encoding="utf-8").splitlines())) > PROFILE_MAX_LINES:
+            report("warn", f"{PROFILE} has {n} lines (target under {PROFILE_MAX_LINES}); trim it in Obsidian")
         if not missing and not lost:
             report("ok", "vault structure complete")
         if repo := git_work_tree(vault):
@@ -206,7 +211,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         report("error", f"unknown clients in configuration: {', '.join(unknown)}")
     else:
         report("ok", f"clients: {', '.join(cfg.clients) or 'none'}")
-        for level, message in check_installed(cfg.clients):
+        for level, message in check_installed(cfg.clients) + check_instructions(cfg.clients):
             report(level, message)
 
     return 1 if errors else 0
@@ -223,16 +228,32 @@ def cmd_where(args: argparse.Namespace) -> int:
     return 0
 
 
-def _install_skills(clients: list[str], force: bool, dry_run: bool) -> int:
+def _install_skills(clients: list[str], force: bool, dry_run: bool, instructions: bool = True) -> int:
+    """Skills and, unless `instructions` is false, the global instruction."""
     report, errors = install_skills(clients, force=force, dry_run=dry_run)
     prefix = "would be " if dry_run else ""
     print("Skills:" if report else "Skills: nothing to install")
     for action, path in report:
         print(f"  {prefix}{action:9} {path}")
+    if not instructions:
+        print("Global instruction: skipped (--no-instructions)")
+        return errors
+    report = install_instructions(clients, dry_run=dry_run)
+    print("Global instruction:" if report else "Global instruction: no instruction files for these clients")
+    for action, path in report:
+        print(f"  {prefix if action != 'unchanged' else ''}{action:9} {path}")
+    if "cursor" in clients and not dry_run:
+        print("  Cursor keeps User Rules in its settings: paste the text below into")
+        print("  Settings -> Rules -> User Rules (kb install-skills --print-instruction shows it again).")
+        print()
+        print(instruction_text())
     return errors
 
 
 def cmd_install_skills(args: argparse.Namespace) -> int:
+    if args.print_instruction:
+        print(instruction_text(), end="")
+        return 0
     if args.clients is not None:
         try:
             clients = _parse_clients(args.clients)
@@ -243,7 +264,7 @@ def cmd_install_skills(args: argparse.Namespace) -> int:
         if cfg is None:
             return _error("no configuration; run kb setup or pass --clients")
         clients = cfg.clients
-    return 1 if _install_skills(clients, args.force, args.dry_run) else 0
+    return 1 if _install_skills(clients, args.force, args.dry_run, not args.no_instructions) else 0
 
 
 def _parse_fields(values: list[str]) -> dict[str, str]:
@@ -385,7 +406,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vault", help=f"vault folder (default: {DEFAULT_VAULT})")
     p.add_argument("--clients", help=f"comma-separated: {','.join(KNOWN_CLIENTS)}")
     p.add_argument("--yes", action="store_true", help="accept defaults without prompting")
-    p.add_argument("--no-skills", action="store_true", help="do not install skills into the clients")
+    p.add_argument("--no-skills", action="store_true",
+                   help="do not install skills or the global instruction into the clients")
+    p.add_argument("--no-instructions", action="store_true",
+                   help="do not add the ms-kb block to ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md")
     p.set_defaults(func=cmd_setup)
 
     p = sub.add_parser("init", help="create the vault structure; never overwrites files")
@@ -401,10 +425,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="print the vault path")
     p.set_defaults(func=cmd_where)
 
-    p = sub.add_parser("install-skills", help="install the bundled skills into the clients")
+    p = sub.add_parser("install-skills", help="install the bundled skills and the global instruction into the clients")
     p.add_argument("--clients", help="comma-separated (default: the configured clients)")
     p.add_argument("--force", action="store_true", help="replace skill folders not installed by ms-kb")
     p.add_argument("--dry-run", action="store_true", help="show what would change")
+    p.add_argument("--no-instructions", action="store_true",
+                   help="do not add the ms-kb block to ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md")
+    p.add_argument("--print-instruction", action="store_true",
+                   help="print the global instruction text (to paste into Cursor User Rules) and exit")
     p.set_defaults(func=cmd_install_skills)
 
     p = sub.add_parser("search", help="find notes by text, type, topics and fields")

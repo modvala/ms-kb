@@ -18,20 +18,26 @@ kb doctor     # checks the configuration and the vault
 kb where      # prints the vault path
 ```
 
-`kb setup` also installs the `add-knowledge` skill into the chosen clients (`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex; Cursor reads both). Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder. `learning_profile.md` is your data: if it disappears from a vault in use, `kb init` does not recreate it and `kb doctor` suggests restoring it from a backup; `kb init --new-profile` starts an empty one.
+`kb setup` also installs the `add-knowledge` and `kb-recall` skills into the chosen clients (`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex; Cursor reads both), and adds a short global instruction that tells the agent the knowledge base exists: a block between `<!-- ms-kb:begin -->` and `<!-- ms-kb:end -->` in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` (`$CODEX_HOME` is respected). Only that block is ever changed; `--no-instructions` skips it. Cursor keeps its rules in the app, so `kb setup` prints the text to paste into Settings → Rules → User Rules (`kb install-skills --print-instruction` shows it again). Then open the vault folder in Obsidian with "Open folder as vault". `kb init [PATH]` creates any missing folders and files and never overwrites existing ones, so it is safe to run again or to point at an existing folder. `learning_profile.md` is your data: if it disappears from a vault in use, `kb init` does not recreate it and `kb doctor` suggests restoring it from a backup; `kb init --new-profile` starts an empty one.
 
 ## Saving knowledge
 
 At the end of a learning conversation, invoke the skill: `/add-knowledge` in Claude Code and Cursor, `$add-knowledge` in Codex. Optionally name a topic to save only part of the conversation. The agent writes a learning-session note, creates or extends concept notes, and lists the files it changed. Before extending existing notes it shows a plan and waits for your confirmation.
 
-The skill writes only through the CLI, which you can also use directly:
+## Continuing where you left off
+
+In a new conversation, just say "let's continue with RAG" or "what did I leave unclear about transformers". The agent uses the `kb-recall` skill (or invoke it by hand: `/kb-recall`, `$kb-recall` in Codex). It reads `learning_profile.md`, searches for a few relevant notes, and answers from them: what you studied, what was concluded, what is still open, with paths to the notes. It never writes, and it says so when it finds nothing. Questions that need no personal context do not touch the knowledge base.
+
+## The CLI
+
+The skills write only through the CLI, which you can also use directly:
 
 ```bash
 kb search rag --type concept           # text, --topic, --field created_by.skill=add-knowledge, --json
 kb new concept --title RAG --topic rag --body-file notes.md
 kb extend concepts/RAG.md --body-file more.md   # appends '## Section' blocks, never rewrites
 kb validate                            # check every note against the schema
-kb install-skills                      # reinstall the skills for the configured clients
+kb install-skills                      # reinstall the skills and the global instruction
 ```
 
 The configuration lives in `~/.config/ms-kb/config.toml` (`KB_CONFIG` overrides the path); see [examples/config.example.toml](examples/config.example.toml).
