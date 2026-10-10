@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.5"
+document_version: "1.6"
 created: "2026-10-09"
 language: en
 status: draft
@@ -10,7 +10,7 @@ design_ref: "personal-knowledge-design-v1.md"
 design_version: "1.10"
 ---
 
-# Personal Knowledge System — Roadmap v1.5
+# Personal Knowledge System — Roadmap v1.6
 
 ## 1. Purpose
 
@@ -18,7 +18,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 
 **MVP goal:** after a long learning conversation in Claude Code, Codex or Cursor, invoke `add-knowledge` and get tidy notes in the local knowledge base; in the next conversation, use `kb-recall` to continue with what has already been learned taken into account.
 
-**MVP scope** (from "MVP decisions"): one user; Python + `uv`; Claude Code, Codex and Cursor clients; one new knowledge base created from scratch; writes only on explicit skill invocation; local vault, copied to Google Drive by a separate command; ChatGPT, MCP, subagents, hooks, multiple knowledge bases and mobile access come after the MVP.
+**MVP scope** (from "MVP decisions"): one user; Python + `uv`; Claude Code, Codex and Cursor clients; one new knowledge base created from scratch; writes only on explicit skill invocation; local vault; whether it gets an off-machine copy, and how (a separate Git repository for the vault, Google Drive or neither), is decided by research in stage 4; ChatGPT, MCP, subagents, hooks, multiple knowledge bases and mobile access come after the MVP.
 
 ## 2. Stage overview
 
@@ -28,7 +28,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 | 1. Knowledge base | v0.2 | ✅ Done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ✅ Done | Conversation outcomes are saved to the knowledge base (checked in Claude Code; Codex and Cursor in stage 5), with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
 | 3. Reading: `kb-recall` | v0.4 | ⬜ Not done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
-| 4. Updates and cloud copy | v0.5 | ⬜ Not done | `kb update` in a single command; sync and data-integrity design chosen (Git/GitHub and/or Google Drive) and implemented in `kb sync`; deleted notes are detected and restored | US-13, US-17, US-18, US-20 |
+| 4. Updates and data protection | v0.5 | ⬜ Not done | `kb update` in a single command; research on vault storage done (separate Git repository vs Google Drive vs no cloud copy); deleted notes are detected and restored; `kb sync` only if the research chooses a remote copy | US-13, US-17, US-18, US-20 |
 | 5. Stabilization | v1.0 | ⬜ Not done | CI on typical scenarios, provenance queries, documentation; the MVP is ready for daily use | US-12, US-13, US-23 |
 | Later | v1.x+ | — | Extensions from the backlog (§4) | US-02, US-03, US-05, US-06, US-14, US-21, US-22 |
 
@@ -103,28 +103,31 @@ Work:
 
 **Done when:** in a new conversation, "let's continue studying X" yields an answer grounded in past notes and open questions; a simple question that needs no personal context does not read the knowledge base.
 
-### Stage 4. Updates and cloud copy → v0.5
+### Stage 4. Updates and data protection → v0.5
 
 **Status:** ⬜ Not done
 
-**Goal:** the package is easy to update, and the knowledge base is protected from accidental deletion.
+**Goal:** the package is easy to update, and the knowledge base is protected from accidental deletion. Cloud sync is not a committed result of this stage: whether the vault needs an off-machine copy at all is an open research question.
 
 Work:
 
 - `kb update`: `uv tool upgrade` + reinstalling skills into all chosen clients in a single command.
 - Version consistency checks: `kb doctor` and a warning in the skill before writing.
-- **Design decision on sync and data integrity** (design §12.3, §12.4), made before any implementation:
-  - Choose the mechanism: Git + private GitHub, Google Drive via `rclone` (§12.1), or both; the second independent copy (Time Machine or Drive).
-  - How changes made outside `kb` (Obsidian, file manager) get into the copy; when `kb sync` runs: manually, on a schedule, or after every write.
+- **Research: where the vault lives besides the local folder** (design §12.3, §12.4), done before any implementation. Three separate needs, decided separately:
+  - *Change history and restore* — a separate Git repository at the vault root (never the package repository), local only, with `kb` committing after each write. Covers accidental deletion without any cloud.
+  - *Off-machine copy* — is it needed in the MVP, or is local Git + Time Machine enough? If needed: a private remote for the vault repository (GitHub or another host) vs Google Drive via `rclone` (§12.1). Check force-push protection on private repositories, attachment size limits, secrets in notes.
+  - *Multi-device / two-way sync* — not in the MVP; goes to the backlog together with mobile access.
+  - How changes made outside `kb` (Obsidian, file manager) get into history; when commits and (if any) pushes run: manually, on a schedule, or after every write.
   - How data validity is maintained: regenerable vs user-data files, detection of deleted notes (broken wiki-links, a manifest of notes written by `kb`), the restore flow, and the rule that a local deletion never reaches the copy without an archived version.
   - Record the decision in the design and requirements (decisions 9 and 17, §12, §14, US-20), including the `kb doctor` warning about Git and the sync section of the configuration.
 - **Implementation of the chosen design:**
-  - `kb sync` for the chosen mechanism (for Git: commits by `kb` after each write, `git add -A` for outside changes, push to the private repository; for `rclone`: `--backup-dir`, never a plain `sync`); one-time authorization setup.
+  - History: if Git is chosen, `kb` initializes the vault repository and commits after each write, `git add -A` for outside changes.
+  - `kb sync` only if the research chooses an off-machine copy (for Git: push to the vault's private remote; for `rclone`: `--backup-dir`, never a plain `sync`); one-time authorization setup.
   - `kb doctor` / `kb validate`: broken wiki-links and notes missing compared with the manifest.
   - `kb restore` for deleted or damaged notes.
   - Skill rule: never delete, move or rename vault files and never run Git there; only `kb` changes the vault.
 
-**Done when:** releasing a new version and running `kb update` updates the skills in all clients; the sync and data-integrity design is recorded; after a note is accidentally deleted, `kb doctor` reports it and it can be restored from the chosen copy.
+**Done when:** releasing a new version and running `kb update` updates the skills in all clients; the storage research is recorded in the design (with an explicit "no cloud copy in the MVP" if that is the outcome); after a note is accidentally deleted, `kb doctor` reports it and it can be restored from history or the chosen copy.
 
 ### Stage 5. Stabilization → v1.0
 
@@ -138,7 +141,7 @@ Work:
 - Hands-on check of all skills (`add-knowledge`, `kb-recall`), the global instruction and `kb update` in Codex and Cursor together, deferred from stages 2–4; results go to [clients-v0.md](clients-v0.md). Includes whether Cursor shows duplicate skills and which environment variables identify Codex and Cursor for `agent` in provenance.
 - Provenance queries: `kb search --skill --version`, finding research as of a date (US-12, US-13).
 - Versioning policy and release history (changelog), configuration migration path.
-- Documentation: installation, updating, first run, restoring from the cloud copy.
+- Documentation: installation, updating, first run, restoring deleted notes.
 
 **Done when:** all typical MVP scenarios from the user stories pass manually in Claude Code, Codex and Cursor and in CI; the `v1.0.0` tag is released.
 
@@ -157,7 +160,7 @@ The order is approximate: items at the top are closer to the current value.
 | Note change history, `kb backup` snapshots (covered by stage 4 if Git is chosen) | More reliable restore and revision | US-13, design §12.1, §12.3 |
 | MCP wrapper over the core | Access for clients without a shell | design §9.1 |
 | ChatGPT | Desktop Work mode or a cloud inbox | design §12.2 |
-| Mobile access | Reading/editing the knowledge base from a phone | US-20 |
+| Mobile access and multi-device sync | Reading/editing the knowledge base from a phone or a second computer; two-way sync | US-20, design §12.1, §12.3 |
 | Multiple knowledge bases | Separate vaults on one installation | US-21 |
 | Other users, publishing | Package installation by someone other than the author | US-22 |
 
@@ -169,7 +172,7 @@ The order is approximate: items at the top are closer to the current value.
 | The agent loses early details of a long conversation after context compaction | Stage 2 | Recommend invoking `add-knowledge` before compaction; later, a hook reminder |
 | Duplicates and knowledge "smeared" across notes | Stages 2–3 | Search before writing, duplicate checks in the CLI, change report |
 | CLI and skills versions diverge | Stage 4 | `kb update` as a single command, `kb doctor`, version check in the skill |
-| The cloud copy does not protect against everything | Stage 4 | One-way sync with a version archive or Git history; a second independent copy; detection of deleted notes in `kb doctor` |
+| Local history alone does not survive loss of the computer | Stage 4 | Time Machine as an independent copy; an off-machine copy if the research shows it is needed; detection of deleted notes in `kb doctor` |
 | A recreated empty file hides lost user data (`learning_profile.md`) | Stage 2 | User-data files are never silently recreated by `kb init` |
 
 ## 6. Document history
@@ -180,3 +183,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.3 — 2026-10-09:** stage 1 done: package `v0.2.0` with `kb setup`, `kb init`, `kb doctor` v0 and `kb where`; vault templates with Mermaid and attachment examples; CI smoke test on a temporary vault.
 - **1.4 — 2026-10-10:** stage 2: `learning_profile.md` treated as user data. Stage 4: a design decision on sync and data integrity (Git/GitHub and/or Google Drive, design §12.3–§12.4) before implementing `kb sync`, plus detection and restore of deleted notes. Design reference updated to 1.9.
 - **1.5 — 2026-10-10:** stage 2 done: package `v0.3.0` with `kb search`, `kb new`, `kb extend`, `kb validate`, `kb install-skills` and the `add-knowledge` skill; `learning_profile.md` as user data; checked hands-on in Claude Code; hands-on checks in Codex and Cursor moved to stage 5, where all skills are checked in those clients together. Design reference updated to 1.10.
+- **1.6 — 2026-10-10:** stage 4 renamed "Updates and data protection": cloud sync is no longer a committed result. Stage 4 starts with research on vault storage, split into change history (a separate Git repository for the vault), an off-machine copy (needed or not; private remote vs Google Drive) and multi-device sync (backlog). `kb sync` is implemented only if a remote copy is chosen. MVP scope, risks and backlog updated.
