@@ -36,7 +36,7 @@ def test_new_stamps_provenance(vault, kb, capsys):
     note = read_note(vault / "concepts" / "RAG.md")
     prov = note.meta["created_by"]
     assert prov["skill"] == "add-knowledge"
-    assert prov["skill_version"] == "0.4.0"
+    assert prov["skill_version"] == "0.5.0"
     assert prov["package_version"] == __version__
     assert prov["date"] == TODAY
     assert "agent" not in prov

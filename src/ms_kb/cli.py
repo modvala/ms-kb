@@ -1,6 +1,8 @@
 import argparse
 import difflib
 import json
+import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,11 +22,11 @@ from ms_kb.config import (
 from ms_kb.notes import NOTE_TYPES, PROFILE, NoteError, read_note
 from ms_kb.schema import validate
 from ms_kb.search import note_files, search
-from ms_kb.installer import SkillError, check_installed, install_skills
+from ms_kb.installer import SkillError, check_installed, install_skills, outdated_skills
 from ms_kb.instructions import check_instructions, install_instructions, instruction_text
 from ms_kb import history, integrity, schedule, vaultstate
 from ms_kb.history import GitError
-from ms_kb.provenance import trailers
+from ms_kb.provenance import REPO_URL, trailers
 from ms_kb.secretscan import find_secrets
 from ms_kb.vault import check_vault, has_notes, init_vault
 from ms_kb.write import WriteError, extend_note, new_note, save
@@ -436,7 +438,34 @@ def cmd_where(args: argparse.Namespace) -> int:
         print(cfg.default().vault)
     except ConfigError as e:
         return _error(str(e))
+    if old := outdated_skills(cfg.clients):
+        _warn(f"installed skills come from ms-kb {', '.join(old)}, the CLI is {__version__}; run kb update")
     return 0
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    """Upgrade the package, then let the new kb reinstall skills and instructions (US-17)."""
+    uv = shutil.which("uv")
+    if uv is None:
+        return _error("uv not found; update by hand: uv tool upgrade ms-kb && kb install-skills")
+    if args.ref:
+        cmd = [uv, "tool", "install", "--force", f"git+{REPO_URL}@{args.ref}"]
+    else:
+        cmd = [uv, "tool", "upgrade", "ms-kb"]
+    print(f"Running: {' '.join(cmd)}", flush=True)
+    if subprocess.run(cmd).returncode != 0:
+        return _error("the package update failed; nothing else was changed")
+    bin_dir = subprocess.run([uv, "tool", "dir", "--bin"], capture_output=True, text=True).stdout.strip()
+    kb = Path(bin_dir) / "kb"
+    if not kb.is_file():
+        return _error(f"{kb} not found after the update; run kb install-skills by hand")
+    new = subprocess.run([str(kb), "--version"], capture_output=True, text=True).stdout.strip()
+    print(f"kb {__version__} -> {new.removeprefix('kb ') or '?'}", flush=True)
+    # This process still runs the old package: the new kb installs its own skills.
+    errors = subprocess.run([str(kb), "install-skills"]).returncode
+    if schedule.installed():
+        errors |= subprocess.run([str(kb), "sync", "--schedule", "on"]).returncode
+    return 1 if errors else 0
 
 
 def _install_skills(clients: list[str], force: bool, dry_run: bool, instructions: bool = True) -> int:
@@ -777,6 +806,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ack", action="append", default=[], metavar="PATH",
                    help="accept a reported deletion or damage of PATH as intentional; repeatable")
     p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("update", help="update the package, then the skills and instructions in all clients")
+    p.add_argument("--ref", help="install this tag or branch (e.g. v0.5.0) instead of the latest version")
+    p.set_defaults(func=cmd_update)
 
     p = sub.add_parser("where", help="print the vault path")
     p.set_defaults(func=cmd_where)

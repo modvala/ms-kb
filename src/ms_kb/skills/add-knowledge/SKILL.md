@@ -7,13 +7,18 @@ description: >-
   Use only when the user explicitly asks to save, record or add what was learned
   to the knowledge base, or invokes add-knowledge; never on your own initiative.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   package: ms-kb
 ---
 
 # add-knowledge
 
-Collect what was learned in this conversation and save it to the user's knowledge base. The invocation itself is the permission to write. Write **only** through the `kb` CLI (`kb new`, `kb extend`). It stamps provenance, validates notes and refuses duplicates. Never create or edit note files with your own file tools.
+Collect what was learned in this conversation and save it to the user's knowledge base. The invocation itself is the permission to write. Write **only** through the `kb` CLI (`kb new`, `kb extend`). It stamps provenance, validates notes, refuses duplicates and commits every write to the vault's own history. Never create or edit note files with your own file tools.
+
+Hard rules for the vault:
+
+- Never delete, move or rename vault files, and never change them with anything but `kb new` / `kb extend`.
+- Never run `git` in the vault, and never run `kb restore` or `kb sync`. They are the user's commands.
 
 If the user named a topic or part of the conversation, save only that. Otherwise save the whole conversation.
 
@@ -23,6 +28,7 @@ Run `kb where`.
 
 - If the shell says `kb` is not found, the tool directory is not on this shell's PATH. Try `~/.local/bin/kb where`; `uv tool dir --bin` prints the directory if it is elsewhere. If that works, use that full path for every `kb` command below.
 - If `kb where` itself fails, stop and tell the user to run `kb setup`. Keep any `kb: warning:` lines you see later (for example "run kb install-skills") for the final report.
+- If `kb where` warns that the installed skills do not match the CLI, tell the user (the fix is `kb update`) and ask whether to save anyway before writing anything.
 
 ## 2. Collect
 
@@ -135,6 +141,8 @@ Rules:
 - `--related` takes note names. The CLI adds them as `[[links]]` both in frontmatter and under `## Related`.
 - If `kb new` says the note already exists, or that similar notes exist, extend that note instead. Use `--allow-similar` only if it is really a different subject.
 - If a command fails validation, fix the arguments (usually topics or dates) and run it again.
+- If `kb` refuses a write because the text looks like it contains a secret (a key or token), remove that text and write again. Tell the user what was left out. Never pass `--allow-secret-like`; that flag is for the user.
+- A `kb: warning:` about Git (for example "written but not committed") does not mean the write failed. Keep it for the report.
 - Use `--dry-run` when unsure. It prints the result without writing.
 
 ## 8. Learning profile

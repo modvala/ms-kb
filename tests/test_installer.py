@@ -31,7 +31,7 @@ def test_setup_installs_skills(vault, isolated_home):
     skills = tomllib.loads(installed_path().read_text())["skills"]
     for name in ("add-knowledge", "kb-recall"):
         state = skills[name]
-        assert state["version"] == "0.4.0"
+        assert state["version"] == "0.5.0"
         assert state["package_version"] == __version__
         assert state["targets"] == [f"~/.claude/skills/{name}", f"~/.agents/skills/{name}"]
         assert read_note(skill_dir(isolated_home, ".claude", name) / "SKILL.md").meta["name"] == name

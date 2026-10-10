@@ -9,13 +9,13 @@ description: >-
   was unclear. Read-only. Do not use for general questions that need no
   personal context.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   package: ms-kb
 ---
 
 # kb-recall
 
-Find what the user has already learned on a topic in their knowledge base, and continue from there. This skill only reads. Never create, edit, move or delete vault files, and never run `kb new` or `kb extend` here.
+Find what the user has already learned on a topic in their knowledge base, and continue from there. This skill only reads. Never create, edit, move or delete vault files, never run `git` in the vault, and never run `kb new`, `kb extend`, `kb restore` or `kb sync` here.
 
 Read only what is relevant: the learning profile and a few notes found by search, never the whole vault.
 

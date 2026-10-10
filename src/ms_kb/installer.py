@@ -199,3 +199,16 @@ def check_installed(clients: list[str]) -> list[tuple[str, str]]:
             else:
                 result.append(("warn", f"skill {skill} in {display(d)} is from {package}, CLI is {__version__}; run kb install-skills"))
     return result
+
+
+def outdated_skills(clients: list[str]) -> list[str]:
+    """Package versions of installed skill copies that differ from the CLI (US-17)."""
+    found = set()
+    for d in target_dirs(clients):
+        for skill in bundled_skills():
+            skill_md = d / skill / "SKILL.md"
+            if skill_md.is_file():
+                package = str((read_note(skill_md).meta.get("metadata") or {}).get("package_version", "?"))
+                if package != __version__:
+                    found.add(package)
+    return sorted(found)

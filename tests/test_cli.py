@@ -193,3 +193,73 @@ def test_bad_config_reports_error(isolated_config, capsys):
     assert main(["where"]) == 1
     assert main(["init"]) == 1
     assert "schema_version" in capsys.readouterr().err
+
+
+def test_where_warns_about_outdated_skills(tmp_path, capsys):
+    setup_vault(tmp_path, "--clients", "claude-code")
+    skill_md = tmp_path / "home" / ".claude" / "skills" / "add-knowledge" / "SKILL.md"
+    skill_md.write_text(skill_md.read_text().replace(f'package_version: "{__version__}"', 'package_version: "0.0.1"'))
+    capsys.readouterr()
+    assert main(["where"]) == 0
+    out, err = capsys.readouterr()
+    assert out.strip().endswith("vault")
+    assert f"installed skills come from ms-kb 0.0.1, the CLI is {__version__}; run kb update" in err
+
+
+def test_where_is_quiet_when_versions_match(tmp_path, capsys):
+    setup_vault(tmp_path, "--clients", "claude-code")
+    capsys.readouterr()
+    assert main(["where"]) == 0
+    assert capsys.readouterr().err == ""
+
+
+def fake_update(monkeypatch, tmp_path, fail_upgrade=False):
+    from ms_kb import cli
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "kb").write_text("")
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append([str(c) for c in cmd])
+        out = ""
+        if cmd[1:] == ["tool", "dir", "--bin"]:
+            out = f"{bin_dir}\n"
+        elif cmd[-1] == "--version":
+            out = "kb 9.9.9\n"
+        code = 1 if fail_upgrade and cmd[1] == "tool" and cmd[2] != "dir" else 0
+        return subprocess.CompletedProcess(cmd, code, out, "")
+
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    return calls, str(bin_dir / "kb")
+
+
+def test_update_upgrades_then_new_kb_installs_skills(tmp_path, monkeypatch, capsys):
+    calls, kb = fake_update(monkeypatch, tmp_path)
+    assert main(["update"]) == 0
+    assert calls[0] == ["/usr/bin/uv", "tool", "upgrade", "ms-kb"]
+    assert [kb, "install-skills"] in calls
+    assert f"kb {__version__} -> 9.9.9" in capsys.readouterr().out
+
+
+def test_update_to_a_tag(tmp_path, monkeypatch):
+    calls, _ = fake_update(monkeypatch, tmp_path)
+    assert main(["update", "--ref", "v0.5.0"]) == 0
+    assert calls[0] == ["/usr/bin/uv", "tool", "install", "--force",
+                        "git+https://github.com/modvala/ms-kb@v0.5.0"]
+
+
+def test_update_failure_changes_nothing(tmp_path, monkeypatch, capsys):
+    calls, kb = fake_update(monkeypatch, tmp_path, fail_upgrade=True)
+    assert main(["update"]) == 1
+    assert [kb, "install-skills"] not in calls
+
+
+def test_update_without_uv(monkeypatch, capsys):
+    from ms_kb import cli
+
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    assert main(["update"]) == 1
+    assert "uv tool upgrade ms-kb && kb install-skills" in capsys.readouterr().err
