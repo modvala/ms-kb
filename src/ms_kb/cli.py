@@ -1,6 +1,8 @@
 import argparse
+import difflib
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from ms_kb import __version__
@@ -19,7 +21,7 @@ from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills
 from ms_kb.instructions import check_instructions, install_instructions, instruction_text
-from ms_kb import history, vaultstate
+from ms_kb import history, integrity, vaultstate
 from ms_kb.history import GitError
 from ms_kb.provenance import trailers
 from ms_kb.secretscan import find_secrets
@@ -239,6 +241,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             report("warn", "history: the vault has no Git repository; run kb init")
         else:
             report("error", "history: git not found; install it with xcode-select --install")
+        _doctor_integrity(cfg.default_kb, vault.resolve(), args.ack, report)
 
     unknown = [c for c in cfg.clients if c not in KNOWN_CLIENTS]
     if unknown:
@@ -249,6 +252,27 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             report(level, message)
 
     return 1 if errors else 0
+
+
+def _integrity(name: str, vault: Path, ack: list[str] = ()) -> tuple[list[str], list[integrity.Finding]]:
+    """Acknowledge `ack` paths, then check the vault against the manifest and save it."""
+    with vaultstate.lock(name):
+        state = vaultstate.load(name)
+        acked = [integrity.acknowledge(state, vault, _rel_arg(vault, a)) for a in ack]
+        findings = integrity.check(vault, state)
+        vaultstate.save(name, state)
+    return acked, findings
+
+
+def _doctor_integrity(name: str, vault: Path, ack: list[str], report) -> None:
+    acked, findings = _integrity(name, vault, ack)
+    for message in acked:
+        report("ok", message)
+    for f in findings:
+        report(f.level, f.message)
+    if not any(f.level == "error" for f in findings):
+        state = vaultstate.load(name)
+        report("ok", f"integrity: {len(state['notes'])} notes tracked, none deleted or damaged")
 
 
 def cmd_where(args: argparse.Namespace) -> int:
@@ -455,7 +479,7 @@ def _note_arg(vault: Path, arg: str) -> Path:
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    vault = _vault()
+    name, vault, _ = _kb()
     paths = [_note_arg(vault, p) for p in args.paths] or list(note_files(vault))
     errors = warnings = checked = 0
     for path in paths:
@@ -480,6 +504,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
             print(f"{shown}: warn: {w}")
         errors += len(report.errors)
         warnings += len(report.warnings)
+    if not args.paths:
+        for f in _integrity(name, vault)[1]:
+            if f.level in ("warn", "error"):
+                print(f"{f.rel or '-'}: {f.level}: {f.message}")
+                errors += f.level == "error"
+                warnings += f.level == "warn"
     print(f"{checked} note(s), {errors} error(s), {warnings} warning(s)")
     return 1 if errors else 0
 
@@ -511,6 +541,59 @@ def cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_restore(args: argparse.Namespace) -> int:
+    name, vault, _ = _kb()
+    if history.repo_status(vault)[0] != "own":
+        return _error("the vault has no Git history; run kb init")
+    rel = _rel_arg(vault, args.path)
+    with vaultstate.lock(name):
+        state = vaultstate.load(name)
+        try:
+            rev = history.short(vault, args.at or history.last_version(vault, rel))
+            data = history.show(vault, rev, rel)
+        except GitError as e:
+            return _error(f"{e}; list deleted notes with kb history --deleted")
+        target = vault / rel
+        current = target.read_bytes() if target.is_file() else None
+        if current == data:
+            print(f"unchanged {rel} (same as {rev})")
+            return 0
+        dest = target
+        if current is not None and not args.force:
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            dest = target.with_name(f"{target.stem}.restored-{stamp}{target.suffix}")
+        dest_rel = dest.relative_to(vault).as_posix()
+        prefix = "would be " if args.dry_run else ""
+        if current is None:
+            print(f"{prefix}restored {rel} from {rev}")
+        elif args.force:
+            print(f"{prefix}replaced {rel} with the version from {rev} (the current one is kept in the history)")
+        else:
+            print(f"{prefix}written {dest_rel}: {rel} exists and differs from {rev}; merge what you need")
+        if current is not None:
+            _print_diff(current, data, f"{rel} (current)", f"{rel} ({rev})")
+        if args.dry_run:
+            return 0
+        if args.force:
+            _report_excluded(_commit_external(vault, state))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        _commit(vault, state, [dest_rel], f"kb: restore {rel} from {rev}", {"Restored-From": rev})
+        if dest == target:
+            vaultstate.record(state, vault, rel, "kb restore")
+        vaultstate.save(name, state)
+    return 0
+
+
+def _print_diff(old: bytes, new: bytes, old_name: str, new_name: str) -> None:
+    try:
+        a, b = old.decode("utf-8"), new.decode("utf-8")
+    except UnicodeDecodeError:
+        print("  (binary file: no diff)")
+        return
+    sys.stdout.writelines(difflib.unified_diff(a.splitlines(True), b.splitlines(True), old_name, new_name))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kb", description="Personal knowledge base tools")
     parser.add_argument("--version", action="version", version=f"kb {__version__}")
@@ -534,6 +617,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("doctor", help="check the configuration and the vault")
+    p.add_argument("--ack", action="append", default=[], metavar="PATH",
+                   help="accept a reported deletion or damage of PATH as intentional; repeatable")
     p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("where", help="print the vault path")
@@ -601,6 +686,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deleted", action="store_true", help="only commits that deleted files")
     p.add_argument("--limit", type=int, default=20, help="maximum commits (default 20, 0 = all)")
     p.set_defaults(func=cmd_history)
+
+    p = sub.add_parser("restore", help="bring a note back from the vault's history; never overwrites silently")
+    p.add_argument("path", help="vault-relative path, as kb doctor or kb history --deleted print it")
+    p.add_argument("--at", metavar="REV", help="the version to restore (default: the last one committed)")
+    p.add_argument("--force", action="store_true",
+                   help="replace the current file (it is committed to the history first)")
+    p.add_argument("--dry-run", action="store_true", help="show what would happen")
+    p.set_defaults(func=cmd_restore)
     return parser
 
 
@@ -612,7 +705,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         return args.func(args)
-    except (ConfigError, NoteError, SkillError) as e:
+    except (ConfigError, NoteError, SkillError, GitError) as e:
         return _error(str(e))
     except WriteError as e:
         for message in e.messages:

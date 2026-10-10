@@ -3,6 +3,7 @@
 No index and no embeddings (US-08): the vault is scanned on every call.
 """
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -13,10 +14,13 @@ from ms_kb.notes import TYPE_DIRS, Note, NoteError, read_note
 SIMILARITY = 0.85
 
 
+RESTORED_COPY = re.compile(r"\.restored-\d{8}-\d{6}\.md$")
+
+
 def note_files(vault: Path) -> Iterator[Path]:
-    """Markdown files in the type folders, in a stable order."""
+    """Markdown files in the type folders, in a stable order; kb restore side copies are left out."""
     for folder in TYPE_DIRS.values():
-        yield from sorted((vault / folder).rglob("*.md"))
+        yield from (p for p in sorted((vault / folder).rglob("*.md")) if not RESTORED_COPY.search(p.name))
 
 
 def iter_notes(vault: Path) -> Iterator[tuple[Path, Note]]:

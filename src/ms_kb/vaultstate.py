@@ -1,8 +1,8 @@
 """Per-vault state kept outside the vault, next to installed.toml (design §12.4).
 
 `vault-<kb>.json` holds the manifest of notes (path -> sha256, size, mtime,
-title, writer), the wiki-link targets that resolved at the last check, the
-deletions the user acknowledged, and the last Git commit, push and error.
+title, writer), the wiki-link targets that resolved at the last check, and
+the last Git commit, push and error.
 `<kb>.lock` serializes kb runs on one vault.
 """
 
@@ -25,7 +25,7 @@ def state_path(name: str) -> Path:
 
 
 def empty() -> dict:
-    return {"notes": {}, "links": [], "acknowledged": [], "git": {}}
+    return {"notes": {}, "links": [], "git": {}}
 
 
 def load(name: str) -> dict:
@@ -88,8 +88,6 @@ def fingerprint(path: Path) -> dict:
 def record(state: dict, vault: Path, rel: str, writer: str) -> None:
     """Remember a note as it is now on disk (hash after the write)."""
     state["notes"][rel] = fingerprint(vault / rel) | {"writer": writer}
-    if rel in state["acknowledged"]:
-        state["acknowledged"].remove(rel)
 
 
 def git_ok(state: dict, field: str, rev: str | None = None) -> None:
