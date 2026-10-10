@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Note Schema, Vault Structure and Configuration v0"
-document_version: "0.4"
+document_version: "0.5"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.12"
+design_version: "1.13"
 ---
 
 # Note schema, vault structure and configuration v0
@@ -93,6 +93,8 @@ updates:
   templates/           # copies of the package templates for Obsidian's Templates core plugin
   learning_profile.md  # the brief learning profile (§5)
   README.md            # what this folder is and that it is managed by ms-kb
+  .gitignore           # Obsidian's churn and kb temporary files (stage 4)
+  .git/                # the vault's own history (stage 4, design §12.1)
 ```
 
 - Title-based names (`concepts/RAG.md`) make `[[RAG]]` work in Obsidian without paths. Characters not allowed in file names (`/ \ : * ? " < > |`, `#`, `^`, `[`, `]`) are removed from the title when the file name is built; the full title stays in `title`.
@@ -100,6 +102,7 @@ updates:
 - The folder matches the type, but the type is defined by `type`, not by the folder (design §5.1). The validator warns if they disagree.
 - `templates/` is overwritten only by an explicit command (stage 1: `kb init` creates it and does not touch existing files).
 - `.obsidian/` is created by Obsidian itself; the package does not write to it.
+- `.gitignore` is regenerable like `templates/`. It excludes `.obsidian/workspace*.json`, `.obsidian/cache`, `.trash/`, `.DS_Store` and `*.ms-kb-tmp`. `kb init` makes the vault root its own Git repository unless the vault is inside another repository (design §12.1).
 
 ## 5. Learning profile
 
@@ -144,17 +147,20 @@ vault_path = "~/Knowledge/main"
 [clients]
 enabled = ["claude-code", "codex", "cursor"]
 
-# Stage 4 (design §12.3): kb sync pushes the vault's own Git repository
-# [kbs.main.sync]
-# provider = "git"
-# remote = "origin"
+# Optional (design §12.3): kb sync pushes the vault's own Git repository
+[kbs.main.sync]
+provider = "git"
+remote = "origin"
 ```
 
 - `schema_version` is the configuration schema version (design §7), independent of the package version. A change requires a migration path.
 - The MVP uses one knowledge base (`default_kb`), but the `[kbs.<name>]` shape already allows several (US-21) without a migration.
 - `vault_path` may use `~`; the CLI expands it. Keep the vault outside folders synced by iCloud Drive, Google Drive, Dropbox or OneDrive (design §12).
-- `[kbs.<name>.sync]` (stage 4): `provider = "git"` and `remote`, the name of a remote in the vault's own Git repository that `kb sync` pushes to (design §12.3). Credentials are never stored here.
-- The list of skills installed by the CLI and their versions is kept separately, in `~/.config/ms-kb/installed.toml` (stage 2). It is state, not settings.
+- `[kbs.<name>.sync]` (stage 4, optional): `provider = "git"` (the only provider) and `remote`, the name of a remote in the vault's own Git repository that `kb sync` pushes to (design §12.3). `kb setup --remote URL` sets the remote's URL in the vault repository and writes this table. Credentials are never stored here. Adding the table needs no `schema_version` change.
+- State, not settings, is kept next to the configuration:
+  - `installed.toml`: the skills installed by the CLI and their versions (stage 2), the global instruction targets (stage 3) and the `[schedule]` LaunchAgent kb installed (stage 4);
+  - `vault-<kb>.json` (stage 4): the manifest of notes (path → `sha256`, `size`, `mtime`, `title`, `writer`), the wiki-link targets that resolved at the last check, and the last commit, push and Git error (design §12.4);
+  - `<kb>.lock`: serializes kb commands that write to the vault or its history.
 - **Skills never read this file.** They call the CLI (for example, `kb where` in stage 1, `kb search` in stage 2). The file format stays internal to the CLI, and skills do not depend on the current working folder (US-18).
 
 ## 7. Validation and writing (stage 2)
@@ -168,6 +174,8 @@ Notes are written only by the CLI (design §9.1):
 **Duplicates.** `kb new` refuses to create a note when the vault already has the same file, a note with the same file name in any folder (it would make `[[links]]` ambiguous), or a note of the same type with the same title or alias. Comparison ignores case, spaces and punctuation. A title similar to an existing one of the same type (similarity ≥ 0.85) is refused unless `--allow-similar` is passed. Learning sessions are dated and expected to repeat topics, so only the file itself counts for them.
 
 **Skill versions.** `skill_version` comes from `~/.config/ms-kb/installed.toml`, i.e. from the skill copy the agent reads; `skill_ref` points to the tag of the package that installed it. `agent` is set only from environment variables verified for the client ([clients-v0.md](clients-v0.md) §2).
+
+Every write ends with a Git commit of only the written path, after any outside edits were committed separately; a failed commit is a warning, never a failed write (design §12.1). Text a write adds is checked for key-like strings first: AWS keys, GitHub tokens, `sk-…` API keys, Stripe live keys, Slack tokens, Google API keys and private key blocks, plus `gitleaks` when it is installed. A hit refuses the write unless the user passes `--allow-secret-like`.
 
 Errors (the note is not written):
 
@@ -189,3 +197,4 @@ Warnings:
 - **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from; the learning profile is user data (§5).
 - **0.3 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall`, `## Known topics` is filled by `add-knowledge`, `kb doctor` warns above 150 lines (§5).
 - **0.4 — 2026-10-10:** the planned `[kbs.<name>.sync]` section uses `provider = "git"` with a remote of the vault's own repository instead of `rclone` (design §12.3).
+- **0.5 — 2026-10-10:** roadmap stage 4: `.gitignore` and `.git/` in the vault (§4); `[kbs.<name>.sync]` is live, and `vault-<kb>.json`, the lock and `[schedule]` are documented as state (§6); commits and the secret check on writes (§7).

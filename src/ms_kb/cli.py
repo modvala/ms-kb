@@ -328,7 +328,7 @@ def _doctor_integrity(name: str, vault: Path, ack: list[str], report) -> None:
         report(f.level, f.message)
     if not any(f.level == "error" for f in findings):
         state = vaultstate.load(name)
-        report("ok", f"integrity: {len(state['notes'])} notes tracked, none deleted or damaged")
+        report("ok", f"integrity: {len(state['notes'])} note(s) tracked, none deleted or damaged")
 
 
 STALE_PUSH_HOURS = 24

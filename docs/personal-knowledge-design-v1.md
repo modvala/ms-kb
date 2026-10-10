@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.12"
+document_version: "1.13"
 created: "2026-10-05"
 updated: "2026-10-10"
 language: en
@@ -10,7 +10,7 @@ requirements_version: "1.11"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.12
+# Personal Knowledge System — Design & Contracts v1.13
 
 ## 1. Purpose and status
 
@@ -614,7 +614,7 @@ The history becomes both the note content history (§7, US-13) and a provenance 
 - **Git never blocks a note write.** If `git` is missing (on macOS `/usr/bin/git` is only a shim until the Command Line Tools are installed) or a commit fails, the note is written, a one-line warning is printed and the state is marked stale; `kb doctor` reports it.
 - `.git/index.lock` held by another process: a few retries with a short back-off; the lock is never deleted automatically. `kb` serializes its own invocations with a lock file.
 - Files larger than a size limit (about 50 MB, below GitHub's 100 MiB hard limit) are not committed and are reported. Git LFS is not used: Obsidian is known to hang indexing LFS pointer files.
-- Secrets: a note must not contain them. `kb new` / `kb extend` refuse content with key-like strings (built-in patterns; `gitleaks` in addition when it is installed, not as a hard dependency), and `kb sync` refuses to push when an outside edit contains one. The exact patterns and the override are set during implementation.
+- Secrets: a note must not contain them. `kb new` / `kb extend` refuse content with key-like strings (built-in patterns; `gitleaks` in addition when it is installed, not as a hard dependency), and an outside edit that contains one is never committed, so it cannot be pushed. The patterns, the override and the size limit are in §12.6.
 
 **Reading history.** `kb history [PATH]` wraps `git log` (including deleted notes, following renames); `kb restore` returns a note from history (§12.4).
 
@@ -676,8 +676,8 @@ Protection of user data in three layers. The trust boundary is not the skill tex
 
 **Detect.**
 
-- A **manifest** of notes written by `kb` is kept outside the vault, next to `installed.toml`: path → SHA-256, size, mtime, last writer. `kb` updates it after every write (hash after write). The manifest says what must exist; Git and Time Machine say where to bring it back from.
-- `kb doctor` / `kb validate` classify differences: *changed outside `kb`* (normal Obsidian edits, recorded in the manifest), *moved* (the same content found at another path, or a rename detected by Git), *deleted* (found nowhere; check `.trash/` and suggest `kb restore`), *damaged* (text written by `kb` is missing, the file is empty or truncated — for example an Obsidian buffer overwrote an append). A deletion is reported until the user acknowledges it as intentional.
+- A **manifest** of notes is kept outside the vault, next to `installed.toml`: path → SHA-256, size, mtime, title, last writer. `kb` updates it after every write (hash after write); notes created outside `kb` are added when `kb doctor` or `kb validate` first sees them, so they are protected too. The manifest says what must exist; Git and Time Machine say where to bring it back from.
+- `kb doctor` / `kb validate` classify differences: *changed outside `kb`* (normal Obsidian edits, recorded in the manifest), *moved* (the same content found at another path, or a rename detected by Git), *deleted* (found nowhere; check `.trash/` and suggest `kb restore`), *damaged* (text written by `kb` is missing, the file is empty or truncated — for example an Obsidian buffer overwrote an append). A deletion is reported until the user acknowledges it as intentional (`kb doctor --ack PATH`).
 - **Broken wiki-links** are a second, independent signal. Only a link that used to resolve and no longer does is an alarm; a link to a not-yet-created note is normal in Obsidian. Link resolution is implemented in `kb` (shortest path, aliases), not through third-party libraries.
 - **Freshness.** `kb` keeps a small state file with the last successful commit and push and the last error. `kb doctor` warns when `git` is missing, when writes are newer than the last push by more than a set number of hours, and when the LaunchAgent is not loaded.
 
@@ -694,6 +694,20 @@ Researched in stage 4 and moved to the backlog. Kept here so the MVP choice does
 - Placing the vault inside a synced folder is not an option (§12, principles).
 
 **Multi-device and phone access** (US-20 target state): one two-way mechanism becomes the vault's sync — Obsidian Sync (the simplest path for iOS: end-to-end encrypted, version history of 1 or 12 months depending on the plan, does not transfer hidden folders except `.obsidian`, so `.git` stays on the Mac) or Syncthing for Android. Git remains one-way history on the Mac — commit and push, never pull — and keeps the long history that the sync service's limited window does not. Rules for that stage: if the connection is lost, local data is preserved; diverging changes are detected; silently losing a version is not allowed. The specific conflict resolution rules are decided then.
+
+### 12.6. Implementation decisions (v1.13, roadmap stage 4)
+
+Points that §12.1–§12.4 left to implementation:
+
+- **Secret patterns.** Built in: AWS access keys (`AKIA…`/`ASIA…`), GitHub tokens (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`, `github_pat_`), `sk-…` API keys (OpenAI, Anthropic `sk-ant-…`), Stripe live keys, Slack tokens, Google API keys, `-----BEGIN … PRIVATE KEY-----`; `gitleaks stdin` in addition when it is installed. `kb extend` checks only the lines it adds, so an old note never blocks appending.
+- **Override.** `--allow-secret-like` on `kb new` / `kb extend`, for the user only; the skills never pass it and report the refusal instead.
+- **Outside edits with a secret or over the size limit (50 MB)** are left out of the `external:` commit and reported. They never enter history, so the history never needs rewriting; `kb sync` still pushes the clean commits and exits with an error that lists those files.
+- **Non-interactive Git.** `GIT_TERMINAL_PROMPT=0`, SSH `BatchMode=yes`, `commit.gpgsign=false` and `--no-verify` for kb's commits, so the LaunchAgent never waits for a prompt; when no `user.email` is configured, commits use `kb <kb@localhost>`.
+- **State files** next to `installed.toml`: `vault-<kb>.json` (manifest, link targets that resolved at the last check, last commit, push and error) and `<kb>.lock` (`flock`, serializes kb runs on a vault). The LaunchAgent is recorded in `installed.toml` under `[schedule]`.
+- **Damaged vs changed.** A note is *damaged* when it is empty, its frontmatter no longer parses or disappeared, or it shrank below half of the manifest size; any other difference is a normal outside edit and refreshes the manifest. *Moved* is matched by content hash, then by frontmatter `title`.
+- **Freshness.** `kb doctor` warns when commits are unpushed and the last push is older than 24 hours, when the LaunchAgent is not loaded, and when the last Git operation failed; the last Time Machine backup is shown as information ("unknown" when `tmutil` does not answer).
+- **Commands.** `kb history [PATH] [--deleted]`, `kb restore PATH [--at REV] [--force] [--dry-run]`, `kb sync [--quiet] [--schedule on|off|status]`, `kb update [--ref REF]`, `kb doctor --ack PATH`. The LaunchAgent label is `io.github.modvala.ms-kb.sync`, its log `~/Library/Logs/ms-kb/sync.log`.
+- **Version check before writing.** `kb where`, the first command of both skills, warns on stderr when the installed skills come from another package version; `add-knowledge` then asks the user before writing. `kb update` runs `uv tool upgrade ms-kb` (or `uv tool install --force` at `--ref`) and lets the *new* `kb` reinstall skills, instructions and the schedule.
 
 ## 13. Versions, CI and package maintenance
 
@@ -718,7 +732,7 @@ Updating the package does not overwrite user Markdown files. Configuration chang
 | Learning profile | Brief context separate from detailed knowledge; format in [note-schema-v0.md](note-schema-v0.md) §5; loaded on demand by `kb-recall` (§10) | — |
 | Writing | Explicit skill invocation only; create/extend without duplication; the CLI writes notes and extends append-only; a plan is shown before existing notes are extended | — |
 | History and copy | Local vault outside synced folders; its own Git repository with a commit per `kb` write; `kb sync` pushes to a private remote hourly (LaunchAgent) and on demand; Time Machine as the independent local copy (§12, §12.1, §12.3) | The Git host is the user's choice; a second cloud copy and multi-device sync after the MVP (§12.5) |
-| Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated; manifest, broken-link and freshness checks, `kb restore` without silent overwrites; the OS sandbox, not the skill text, is the boundary for agents (§12.4) | Exact secret patterns and the size limit; automatic checks of agents' sandbox settings (after the MVP) |
+| Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated; manifest, broken-link and freshness checks, `kb restore` without silent overwrites; secret patterns and a 50 MB limit; the OS sandbox, not the skill text, is the boundary for agents (§12.4, §12.6) | Automatic checks of agents' sandbox settings (after the MVP) |
 | ChatGPT | Out of scope at this stage | Possible future paths — §12.2 |
 | Maintenance | Versions and CI | Release process, migrations, whether CD is needed |
 
@@ -739,3 +753,4 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.10 — 2026-10-10:** §12.4: regenerable vs user-data files implemented for `learning_profile.md` (roadmap stage 2). Updated §14.
 - **1.11 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (§10); the global instruction is a marked block in `CLAUDE.md` / `AGENTS.md`, pasted by hand in Cursor (§9.1); MVP search is text and metadata. Updated §14.
 - **1.12 — 2026-10-10:** roadmap stage 4 research done; storage decided. The vault root is its own Git repository with a commit per `kb` write (§12.1); the off-machine copy is a push to a private remote dedicated to the vault, hourly and on demand, with Time Machine as the local copy (§12.3); the v1.2 exclusion of GitHub is revised, the vault never goes into the package repository (§12). Data integrity decided: manifest, broken-link and freshness checks, `kb restore`, agent sandbox settings (§12.4). Google Drive via `rclone`, snapshot backups and multi-device sync moved after the MVP (§12.5; the former §12.1 baseline). Updated decisions 9 and 17, §2.2, §3, §4.2, §7, §11, §11.1, §14.
+- **1.13 — 2026-10-10:** roadmap stage 4 implemented: §12.6 records the decisions left to implementation (secret patterns and override, outside files kept out of history, non-interactive Git, state files, damaged vs changed, freshness threshold, command names, version check before writing). §12.1: outside edits with secrets are never committed. §12.4: the manifest covers notes created outside `kb`; `kb doctor --ack`. Updated §14.

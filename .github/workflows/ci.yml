@@ -26,9 +26,12 @@ jobs:
           KB_CONFIG: ${{ runner.temp }}/kb/config.toml
           VAULT: ${{ runner.temp }}/vault
           HOME: ${{ runner.temp }}/home
+          REMOTE: ${{ runner.temp }}/remote.git
+          CLONE: ${{ runner.temp }}/clone
         run: |
           mkdir -p "$HOME"
-          kb setup --vault "$VAULT" --clients claude-code,codex --yes
+          git init -q --bare -b main "$REMOTE"
+          kb setup --vault "$VAULT" --clients claude-code,codex --yes --remote "$REMOTE" --no-schedule
           kb init
           kb doctor
           test "$(kb where)" = "$(cd "$VAULT" && pwd -P)"
@@ -44,3 +47,25 @@ jobs:
           kb search rag --json | grep -q '"title": "RAG"'
           kb search --field updates.skill=add-knowledge | grep -q RAG.md
           kb validate
+          # History: a commit per write with provenance trailers (design §12.1)
+          git -C "$VAULT" log -1 --format=%B | grep -q 'Kb-Skill: add-knowledge'
+          git -C "$VAULT" log --format=%s | grep -q 'kb: create concepts/RAG.md'
+          # Secrets are refused
+          if printf '## Explanation\nAKIAABCDEFGHIJKLMNOP\n' | kb new concept --title Keys --topic aws --body-file -; then
+            echo "secret was not refused"; exit 1
+          fi
+          # Outside edits get their own commit; kb sync pushes
+          echo "Edited outside kb." >> "$VAULT/concepts/RAG.md"
+          kb sync
+          git -C "$VAULT" log -1 --format=%s | grep -q '^external: '
+          git -C "$REMOTE" log --format=%s main | grep -q 'kb: create concepts/RAG.md'
+          # A deleted note is reported and restored
+          rm "$VAULT/concepts/RAG.md"
+          if kb doctor; then echo "deletion was not reported"; exit 1; fi
+          kb restore concepts/RAG.md
+          test -f "$VAULT/concepts/RAG.md"
+          kb doctor
+          kb history concepts/RAG.md | grep -q 'kb: create concepts/RAG.md'
+          # The vault survives losing the local folder
+          git clone -q "$REMOTE" "$CLONE"
+          test -f "$CLONE/concepts/RAG.md"

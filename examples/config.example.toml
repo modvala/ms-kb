@@ -9,7 +9,8 @@ vault_path = "~/Knowledge/main"
 [clients]
 enabled = ["claude-code", "codex", "cursor"]
 
-# Stage 4 (design §12.3): kb sync pushes the vault's own Git repository
-# [kbs.main.sync]
-# provider = "git"
-# remote = "origin"
+# Optional (design §12.3): kb sync pushes the vault's own Git repository to this
+# remote. kb setup --remote URL writes it; credentials are never stored here.
+[kbs.main.sync]
+provider = "git"
+remote = "origin"

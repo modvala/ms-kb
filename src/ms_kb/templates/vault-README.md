@@ -26,4 +26,7 @@ Use the "Insert template" command in a new note.
 
 - `kb init` adds missing folders and files and never overwrites existing ones.
 - Run `kb doctor` to check the setup and `kb where` to print this folder's path.
-- Do not put this folder into Git or into the ms-kb repository. The cloud copy is made by `kb sync` (coming in a later version).
+- This folder is its own Git repository: every `kb` write is a commit, and edits made in Obsidian are committed separately. Never put it inside the ms-kb repository or a project repository.
+- `kb history PATH` shows a note's versions; `kb restore PATH` brings back a deleted or damaged note without overwriting anything silently.
+- `kb sync` pushes the history to a private remote (hourly if scheduled); it never force-pushes.
+- Keep this folder out of iCloud Drive, Google Drive, Dropbox and OneDrive.
