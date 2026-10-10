@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.11"
+document_version: "1.12"
 created: "2026-10-05"
 updated: "2026-10-10"
 language: en
 status: discussion_baseline
 requirements_ref: "personal-knowledge-user-stories-v1.md"
-requirements_version: "1.10"
+requirements_version: "1.11"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.11
+# Personal Knowledge System — Design & Contracts v1.12
 
 ## 1. Purpose and status
 
@@ -30,7 +30,7 @@ Exact directory names, YAML fields, commands, search models and integrations are
 6. **The project is delivered as an installable package with skills.** Source code, versions and CI are maintained on GitHub.
 7. **The package and the knowledge bases are independent.** One local installation serves several separately initialized knowledge bases with their own settings.
 8. **Skills are available in the user scope.** They can be used outside the project repository in supported clients.
-9. **The vault is stored locally and synced separately.** Sync goes through separate cloud storage, not GitHub; the specific provider is still being chosen.
+9. **The vault is stored locally and has its own history and copy** (revised in v1.12). The vault root is a separate Git repository, never the package repository; its off-machine copy is a push to a private remote dedicated to the vault. Two-way sync between devices comes after the MVP (§12).
 10. **The provenance of results is recorded.** The skill used and its version, the date and the sources can be determined; a later update is distinguishable from the original creation.
 
 Central principle: **Obsidian stores knowledge, not the world.**
@@ -43,13 +43,13 @@ Central principle: **Obsidian stores knowledge, not the world.**
 14. **Skills in a common format + installation adapters.** Skills are written once in a portable format (`SKILL.md`). Each client has its own installation method: for example, a Claude Code plugin, a user skills directory, entry instructions. The clients' current mechanisms are verified at the start of implementation.
 15. **Writes only on explicit command.** Knowledge is saved when the user invokes the `add-knowledge` skill (working name); see §11.2.
 16. **A new knowledge base from scratch.** There is no existing vault; the package creates one with an initialization command.
-17. **Local vault, Google Drive sync as a separate step, not GitHub** (v1.2–v1.4). Notes are always written to a local folder outside Drive; the cloud copy is created separately (`kb sync` via `rclone` is recommended). The vault is not stored in any GitHub repository; GitHub serves only for package code. The MVP goal is a cloud copy in case of local deletion; phone access is deferred. Scheme — §12.1.
+17. **Local vault with its own Git history and a push to a private remote** (v1.2–v1.4, revised in v1.12). Notes are always written to a local folder outside any synced folder. `kb` commits to the vault's own Git repository after every write; `kb sync` commits outside edits and pushes to a private remote dedicated to the vault (any Git host; never the package repository), hourly and on demand. Time Machine is the independent local copy. The MVP goal is to survive accidental deletion and loss of the computer; other cloud copies (Google Drive, snapshot backups) and phone access come after the MVP. Scheme — §12.
 18. **Installation: a Python package that installs the skills itself** (v1.3). First install — `uv tool install` from GitHub, then `kb setup`; updating — a single command, `kb update`. Client plugins are not used in the MVP. Scheme — §4.1.
 19. **Obsidian is not required for the package to work** (v1.3). The package and agents work with Markdown files directly; Obsidian is for the human to read and navigate, and can be installed at any time (§2.2).
 
 ### 2.2. What a vault is
 
-An Obsidian vault is an ordinary folder with Markdown files and attachments. On first open, Obsidian creates a service folder `.obsidian/` in it with the app's settings. There is no special format or database: everything in the folder is notes, and they can be read and edited without Obsidian. Initializing the KB in this project means creating such a folder with the structure, templates, learning profile and configuration; synchronization with cloud storage is set up separately. In Obsidian, the folder is opened via "Open folder as vault".
+An Obsidian vault is an ordinary folder with Markdown files and attachments. On first open, Obsidian creates a service folder `.obsidian/` in it with the app's settings. There is no special format or database: everything in the folder is notes, and they can be read and edited without Obsidian. Initializing the KB in this project means creating such a folder with the structure, templates, learning profile and configuration, plus its own Git repository for history (§12.1); the off-machine copy is set up separately (§12.3). In Obsidian, the folder is opened via "Open folder as vault".
 
 There is no need to install Obsidian in advance: `kb init`, skills and agents (Claude Code, Codex, Cursor) read and write files without it. Obsidian adds convenience for the human: clickable `[[wiki-links]]`, Graph View, Canvas, rendering of Mermaid and attachments. Without it, notes remain plain Markdown that can be opened in any editor.
 
@@ -66,7 +66,7 @@ There is no need to install Obsidian in advance: `kb init`, skills and agents (C
 | Connector / MCP integration | Client access to the corresponding knowledge base or external service | Mandatory presence of semantic search |
 | Retrieval | Finding the right notes/fragments | Canonical storage of knowledge in place of Markdown |
 | Search index, if used | A derived representation for search | An irreplaceable sole copy of knowledge |
-| Sync storage | Exchanging changes of a specific knowledge base between the local vault and the storage | Storing the vault in the package repository |
+| Vault history and remote copy | The vault's own Git repository and its private remote (§12) | Storing the vault in the package repository; two-way sync between devices (after the MVP) |
 | AI client / agent | Choosing operations, reading context and producing results according to the rules | Access to local data without the corresponding connection |
 
 **Context Router** is the name discussed for the context selection logic. For now it is a role in the workflow, not a decision to create a separate service, class or agent.
@@ -82,7 +82,8 @@ flowchart TD
     O --> N["Notion: trackers and tasks"]
     O --> G["Git: implementations"]
     O --> W["Web: original sources"]
-    V <--> Y["This KB's sync storage"]
+    V -- "kb commits" --> H["The vault's own Git repository"]
+    H -- "kb sync: push" --> Y["This KB's private remote"]
 ```
 
 The diagram shows logical dependencies, not a mandatory order in which every component is called. The agent consults additional sources as needed.
@@ -124,7 +125,7 @@ For each instance, the following are distinguishable:
 | Local vault | Location of Markdown files and attachments |
 | User configuration | Settings of this knowledge base and its sources |
 | Connectors | Connections for working with this knowledge base and its supporting sources |
-| Synchronization | Provider and location of this knowledge base's remote data |
+| History and copy | This knowledge base's Git repository and its remote |
 | Learning context | A brief profile and detailed notes |
 | Derived state | Index/sync state, if used |
 
@@ -143,8 +144,8 @@ connector:
   provider: "<chosen-integration>"
 
 sync:
-  provider: "<cloud-storage-not-github>"
-  location: "<storage-for-this-kb-data>"
+  provider: git
+  remote: "<private-remote-of-this-vault>"
 ```
 
 Access settings are set by the user. They are not distributed with the package source code. Another knowledge base uses a different vault and its own configuration. For any read/write operation it must be unambiguous which instance is selected; searching across all knowledge bases by default is not intended.
@@ -363,7 +364,7 @@ A link to a mutable "current skill" does not explain the rules of an old note. *
 | Note version/history | Changes to the content of a specific piece of material |
 | Design document version | The state of recorded agreements |
 
-These versions are not interchangeable. The skill itself + provenance provide traceability of rules and sources; they do not guarantee bit-for-bit reproduction of an LLM response. The policy for note history and updating their metadata is still being refined.
+These versions are not interchangeable. The skill itself + provenance provide traceability of rules and sources; they do not guarantee bit-for-bit reproduction of an LLM response. **Decided in v1.12:** note content history is the vault's Git repository, one commit per `kb` write with provenance in Git trailers (§12.1).
 
 ## 8. Source registry contract
 
@@ -522,7 +523,7 @@ Retrieval describes the process of extracting context and does not imply mandato
 3. Creates a new note or extends a suitable one without repeating what is already written.
 4. Preserves links/basis and processing provenance; contradictions are distinguishable from the previous conclusion.
 5. If a search index exists, updates it for the changed content.
-6. Synchronization propagates the change via the separately chosen mechanism; running sync after every write is not approved.
+6. `kb` commits the changed files to the vault's Git history right after the write; the push to the remote runs on a schedule and via `kb sync`, never synchronously with a write (§12.1, §12.3).
 
 | Input result | Placement |
 |---|---|
@@ -548,7 +549,8 @@ The capabilities discussed are **search, read, create/update/merge**. This is a 
 | Create | Create new material in the corresponding knowledge base |
 | Update/merge | Add/revise knowledge in existing material according to the skill's rules |
 | Init | Create a separate instance with its configuration or connect an existing vault |
-| Sync | Exchange changes of a specific knowledge base with its storage |
+| Sync | Commit outside edits and push the knowledge base's history to its remote |
+| Restore | Return a deleted or damaged note from history (a user command, not exposed to skills) |
 
 Exact tool names, arguments, response formats and the split between the library and an existing plugin have not yet been chosen. It is not assumed that an installed third-party connector already provides all these operations.
 
@@ -566,102 +568,132 @@ Limitation: the agent sees only what is currently in its context. If the client 
 
 A single run can create several notes: for example, a `learning-session` + extending two `concept` notes + one `source`.
 
-## 12. Synchronization, isolation and GitHub's roles
+## 12. Storage, history and GitHub's roles
 
-The local vault remains the accessible copy of the knowledge. Synchronization transfers changes in both directions through separate cloud storage. **GitHub is not used for storing or syncing the vault** (decided in v1.2): notes and attachments go into neither the package repository nor a separate repository. The specific provider (for example, Google Drive, iCloud, Obsidian Sync) and mechanism have not yet been chosen. One sync mechanism is used per vault: two mechanisms on the same folder conflict.
+**Decided in v1.12** after the roadmap stage 4 research. The local vault remains the working copy of the knowledge: agents and the CLI write only to it. Its protection is split into three needs, decided separately:
 
-GitHub has two roles in the system, and neither is related to storing knowledge:
+| Need | MVP decision | After the MVP |
+|---|---|---|
+| Change history and restore | The vault root is its own Git repository; `kb` commits after every write (§12.1) | — |
+| Off-machine copy | `kb sync` pushes that repository to a private remote dedicated to the vault; Time Machine is the independent local copy (§12.3) | A second cloud copy: snapshot backup or Google Drive (§12.5) |
+| Multi-device / two-way sync | Not in the MVP | One two-way mechanism, for example Obsidian Sync; Git stays one-way (§12.5) |
+
+Principles behind the decision:
+
+- **Sync is not backup.** A two-way sync client (iCloud Drive, Google Drive for desktop, Dropbox, OneDrive) propagates a local deletion or corruption to the cloud within seconds; recovery is then limited to the provider's trash, about 30 days on free tiers. A mirror that repeats deletions does not count as an independent copy.
+- **At most one two-way mechanism per vault.** Two two-way mechanisms on the same folder conflict (Obsidian's own guidance). History and the off-machine copy are therefore strictly one-way: commits and pushes leave the Mac, nothing is pulled back. This keeps the single two-way slot free for a future phone.
+- **The vault lives outside synced folders.** Not in iCloud Drive, Google Drive, Dropbox or OneDrive folders, and not in `~/Documents` or `~/Desktop` when iCloud "Desktop & Documents" is on (the default `~/Knowledge/main` is fine). Inside iCloud, "Optimize Mac Storage" can replace a note with an `.icloud` placeholder, a `.git` folder there is a known source of corruption, and moving to Obsidian Sync later requires leaving iCloud anyway.
+- **Only `kb` changes the vault and runs Git in it.** Skills never delete, move or rename vault files and never run Git there (§12.4).
+
+The index, if one is used later, is derived state that can be rebuilt from the notes; it is never committed or copied as canonical knowledge. Indexes, configuration and history of different instances are not mixed.
+
+**GitHub's roles.** The v1.2 exclusion of GitHub ("the vault is not stored in any repository") is revised. Its reason was not recorded; on the merits, a private Git host and Google Drive both see the plaintext, so privacy does not favor either, while Git gives diffs, history and restore of a plain-Markdown vault for free. The goal the exclusion protected — never mixing package code and personal data — is kept: the vault has its own repository, never the package repository.
 
 | Role | What is stored | Relation to the KB |
 |---|---|---|
-| Repository of the distributed package | Library code, skills, templates, CI | Tools that work with the KB |
+| Repository of the distributed package | Library code, skills, templates, CI | Tools that work with the KB; never contains notes |
 | Supporting code source | Code/issues/PRs of a practical project | External basis for project knowledge; the KB holds only links and conclusions |
+| Possible host of the vault's remote | The vault's own private repository | The off-machine copy (§12.3); any Git host works, GitHub is one option |
 
-Without a Git repository, the vault has no built-in history of note changes. Whether it is needed and how to provide it (the provider's version history, local history without a remote repository, or something else) remains an open question (§14). **Under consideration (v1.9):** a separate private Git repository for the vault as its history and backup, which would revise the exclusion of GitHub above — §12.3. Protection of the data itself against accidental deletion — §12.4.
+### 12.1. Vault history: a separate Git repository (v1.12)
 
-### 12.1. Local vault and Google Drive sync (v1.4)
+**Repository.** `kb init` makes the vault root a Git repository of its own, both for a new vault and for an existing one, and writes a `.gitignore` that excludes Obsidian's churn and temporary files: `.obsidian/workspace*.json`, `.obsidian/cache`, `.trash/`, `.DS_Store` and `kb`'s own temporary files. If the vault is inside a *foreign* work tree (a repository whose root is not the vault root, for example a project repository), `kb init` does not create a nested repository and `kb doctor` warns; a vault whose root is its own repository is the normal state.
 
-**The vault is stored locally** — in an ordinary folder outside Google Drive (for example, `~/Knowledge/main`). All agents and the CLI write only to the local folder. Syncing with Google Drive is a separate step that does not affect writing notes. **The MVP goal is a cloud copy of the knowledge base**, so that knowledge is not lost to accidental local deletion or loss of the computer. Access from other devices, including the phone, is deferred.
+**A commit per write.** Every `kb new` / `kb extend` ends with a commit:
 
-**Recommended mechanism: `kb sync` via `rclone`** (a proposal, to be confirmed during implementation):
+1. Before writing, if the work tree has changes made outside `kb` (Obsidian, the file manager), `kb` commits them separately with `git add -A` and a message such as `external: 3 files changed outside kb`. A half-finished user edit never ends up in an agent's commit.
+2. `kb` writes the note and commits **only its own paths** (`git add -- <paths>`). The subject is `kb: create|extend <path>`; Git trailers carry provenance: `Kb-Skill`, `Kb-Skill-Version`, `Kb-Version` and `Kb-Agent` when it is known (§7).
 
-| Direction | What happens |
-|---|---|
-| Local vault → Drive (`kb-backup/`) | One-way copy. A local deletion does not delete the cloud copy; old versions of changed and deleted files are moved to a separate archive folder on Drive |
+The history becomes both the note content history (§7, US-13) and a provenance log (US-12). Because the CLI has no delete command, any deletion in the history happened outside `kb`, so `git log --diff-filter=D` doubles as an audit of deletions.
 
-- `kb sync` is run manually; running it on a schedule or after `add-knowledge` is an open question.
-- One-time setup: installing `rclone` and authorizing Google Drive.
-- The cloud copy is a backup, not a working copy: editing files directly in `kb-backup/` is not intended, so two-way sync conflicts do not arise.
+**Edits outside `kb` when `kb` is not called** are committed by `kb sync`, which runs on a schedule (§12.3). The Obsidian Git plugin may be used by those who keep Obsidian open, in commit-only mode, but the package does not rely on it: Obsidian is not required (decision 19), and two committers on one repository collide on `.git/index.lock`.
 
-**No-code alternative:** backing up the local folder with Google Drive for desktop. Downsides: deletions probably propagate to the cloud too, and the process cannot be controlled from `kb`.
+**Implementation rules:**
 
-**Phone (deferred).** With the one-way scheme, the cloud copy is read-only. Mobile editing will require a separate decision when it becomes necessary.
+- Git is called through `subprocess`; GitPython is in maintenance mode and needs the `git` binary anyway.
+- **Git never blocks a note write.** If `git` is missing (on macOS `/usr/bin/git` is only a shim until the Command Line Tools are installed) or a commit fails, the note is written, a one-line warning is printed and the state is marked stale; `kb doctor` reports it.
+- `.git/index.lock` held by another process: a few retries with a short back-off; the lock is never deleted automatically. `kb` serializes its own invocations with a lock file.
+- Files larger than a size limit (about 50 MB, below GitHub's 100 MiB hard limit) are not committed and are reported. Git LFS is not used: Obsidian is known to hang indexing LFS pointer files.
+- Secrets: a note must not contain them. `kb new` / `kb extend` refuse content with key-like strings (built-in patterns; `gitleaks` in addition when it is installed, not as a hard dependency), and `kb sync` refuses to push when an outside edit contains one. The exact patterns and the override are set during implementation.
+
+**Reading history.** `kb history [PATH]` wraps `git log` (including deleted notes, following renames); `kb restore` returns a note from history (§12.4).
 
 ### 12.2. ChatGPT — out of scope (v1.5)
 
 ChatGPT is excluded from scope at this stage to avoid complicating the MVP. The research results are kept for the future:
 
 - **ChatGPT desktop app (Work mode, local project).** After the merger with Codex (July 2026), local Work conversations, according to the release notes, work with local folders and pick up `AGENTS.md` and skills in the project's root folder. This is the simplest future path: ChatGPT becomes a local client just like Codex. Needs verification.
-- **Web/mobile ChatGPT.** Cannot write to the local vault. A possible path is a cloud inbox: ChatGPT creates an `.md` file in Google Drive, `kb sync` pulls it into a local `inbox/`, and `add-knowledge` processes it. Depends on whether the Drive connector can create files.
+- **Web/mobile ChatGPT.** Cannot write to the local vault. A possible path is a cloud inbox: ChatGPT creates an `.md` file in a cloud folder, a later sync step pulls it into a local `inbox/`, and `add-knowledge` processes it. Depends on whether the connector can create files and on a cloud copy existing (§12.5).
 - **A custom MCP with write access** is not available on the Plus plan (according to OpenAI's help center — only Business/Enterprise/Edu).
 
-If the connection is lost, local data is preserved. Diverging changes are detected; silently losing a version is not allowed. The specific conflict resolution rules are open. Synchronization is not considered a complete backup solution.
+### 12.3. Off-machine copy: push to a private remote (v1.12)
 
-The index, if used, is derived state that can be rebuilt from the notes. Transferring it is not a condition for preserving canonical knowledge. Indexes, configuration and sync state of different instances are not mixed by default.
+**Why it is needed.** Local Git history is history, not durability: deleting the vault folder together with `.git`, or losing the disk, loses both. Time Machine covers accidental deletion and damage well (hourly backups for a day, daily for a month, weekly until the disk is full), but its local snapshots live on the same disk for 24 hours, and an external disk kept next to the laptop does not survive theft or fire. The MVP goal includes loss of the computer, so an off-machine copy is part of the MVP.
 
-### 12.3. Under consideration: Git as the vault's history and backup (v1.9)
+**Mechanism.** `kb sync` commits outside edits (§12.1) and runs `git push` to the remote configured for the vault:
 
-**Status: open, not decided.** This section records a proposal for further consideration. Until the decision is made in roadmap stage 4, §12 and §12.1 remain the current baseline. The original reason for excluding GitHub (v1.2) was not recorded, so the exclusion is reconsidered on its merits.
+- never with `--force`; a push rejected as non-fast-forward is reported, not forced;
+- non-interactively (`GIT_TERMINAL_PROMPT=0`, SSH `BatchMode=yes`), so a call never hangs on a password prompt;
+- authentication is the user's: an SSH key or, narrowest, a deploy key with write access to that one repository. `kb` stores no credentials.
 
-**Why Git fits this vault:**
+**Triggering.** Pushes never run synchronously with a write, so the network never blocks an agent. A LaunchAgent installed by `kb setup` with the user's consent runs `kb sync` hourly (`StartCalendarInterval` plus `RunAtLoad`: unlike `StartInterval`, missed runs during sleep are coalesced into one on wake; `WatchPaths` is race-prone per Apple). `kb sync` can also be run manually. Without a network, commits accumulate locally and the next run pushes them.
 
-- Notes are plain Markdown text: Git gives diffs, full history and restoration of deleted files out of the box (`git log --diff-filter=D`, `git checkout <commit>^ -- <path>`). This also answers the open "note change history" question (§14, US-13).
-- All agent writes go through the CLI (§9.1), so `kb` can commit after every successful write with a message carrying provenance, for example `add-knowledge v0.3.0: extend concepts/RAG.md`. The history becomes a log of which skill and version changed what (§7, US-12).
-- A private GitHub repository is an off-machine copy, just like Google Drive. For a single user, both are third-party services, so privacy does not clearly favor either.
+**Configuration** (note-schema §6):
 
-**Proposed scheme (an example, not an approved contract):**
+```toml
+[kbs.main.sync]
+provider = "git"
+remote = "origin"   # a remote of the vault's own repository
+```
 
-| Part | What happens |
-|---|---|
-| Local history | The vault root is a Git repository of its own (never the package repository or a project repository). `kb` commits after each `kb new` / `kb extend` |
-| Changes outside `kb` | Edits and deletions made in Obsidian or the file manager are committed by `kb sync` (`git add -A`), on a schedule or via an Obsidian Git plugin — to be decided |
-| Off-machine copy | `kb sync` pushes to a private GitHub repository dedicated to this vault |
-| Restore | `kb restore <path>` returns a deleted or damaged note from history |
-| Second independent copy | Time Machine (free, already on macOS); Google Drive becomes optional |
+**Host choice is the user's.** `kb` works with any Git host. Limits that matter for a Markdown vault: GitHub blocks files over 100 MiB and recommends repositories under 1 GB; only attachments can approach these limits. Known weakness: on **GitHub Free**, protected branches and rulesets are not available for private repositories (they start with GitHub Pro, and even there the owner bypasses them unless "Do not allow bypassing" is set), so a force-push cannot be forbidden. This is accepted because the remote is one of three copies (the local `.git`, Time Machine, the remote): losing all three needs the vault and `.git` erased, a force-push, and no Time Machine disk. Stronger options are documented, not required: GitLab Free (protected branches on private projects), GitHub Pro with bypass disabled, or a bare repository on a NAS with `receive.denyNonFastForwards`. Codeberg does not fit (about 100 MB for private content, not meant for backups).
 
-**Options to choose from:**
+**Privacy.** The host sees the plaintext, as Google Drive would. GitHub does not scan private repositories of personal accounts for secrets, hence the local check in §12.1. Encryption on top of Git is not used in the MVP: `git-crypt` leaves file names and commit messages readable, and `git-remote-gcrypt` makes every push a full re-upload. If privacy becomes more important, the path is an encrypted snapshot backup (§12.5), not encrypted Git.
 
-1. **Git + private GitHub only** (recommended for the MVP): history, deletion recovery and an off-machine copy with one mechanism; Time Machine as the second copy.
-2. **Git + GitHub + Google Drive**: two independent cloud copies. Both are one-way, so they do not conflict (unlike two two-way sync mechanisms, §12), but setup is heavier (`rclone`, Google authorization).
-3. **Google Drive only** (current §12.1): a cloud copy with an archive of old versions, but no convenient change history.
+**Time Machine** is the recommended independent local copy. `kb` does not manage it; `kb doctor` may show the last backup time as information and reports "unknown", not "no backup", when `tmutil` is not allowed to answer.
 
-**Risks and mitigations:**
+With this scheme, the rule "a local deletion never reaches the copy without an archived version" (§12.4) holds by construction: a deletion is just another commit, and the previous version stays in the history on both sides.
 
-| Risk | Mitigation |
-|---|---|
-| Git is not a backup by itself: an agent may run `git push --force` or `git reset --hard`; force-push protection for private repositories may require a paid GitHub plan (to verify) | Only `kb` runs Git in the vault; skills forbid Git commands there; a second independent copy (Time Machine or Drive) |
-| Binary attachments bloat the repository; GitHub rejects files over 100 MB | Ignore large files in `attachments/` via `.gitignore`, or use Git LFS |
-| Secrets pasted into a conversation end up in a note and are pushed | A simple check for key-like strings in `kb` before committing; notes must not contain secrets |
-| Phone access through Git is inconvenient | Phone access is deferred (US-20); Drive can be added later for it |
+### 12.4. Data integrity: protection against accidental deletion (v1.9, decided in v1.12)
 
-**What changes if the proposal is accepted:** decisions 9 and 17 (§2), §12/§12.1, §14, US-20 and the GitHub boundaries in the requirements; the `kb doctor` warning about Git (it should warn only when the vault is inside a *foreign* repository, not when the vault root is its own repository); the sync section of the configuration (`provider = "git"` with a remote instead of `provider = "rclone"`).
-
-### 12.4. Data integrity: protection against accidental deletion (v1.9)
-
-**Status: open, for further consideration together with §12.3.** Files in the vault fall into two classes that need different protection:
+Files in the vault fall into two classes that need different protection:
 
 | Class | Files | If deleted |
 |---|---|---|
-| Regenerable | Folders, `templates/*.md`, `README.md` | `kb doctor` reports them; `kb init` recreates them |
+| Regenerable | Folders, `templates/*.md`, `README.md`, `.gitignore` | `kb doctor` reports them; `kb init` recreates them |
 | User data | All notes and `learning_profile.md` (extended by `kb extend`) | Cannot be regenerated; restore only from history or a backup |
 
-`learning_profile.md` is currently created by `kb init` like a regenerable file. If it is deleted, `kb doctor` suggests `kb init`, which silently recreates an empty profile and hides the loss. It must be treated as user data: `kb doctor` points to a restore instead, and `kb init` recreates it only on a fresh vault or with an explicit flag. **Done in v1.10 (roadmap stage 2):** `kb init` and `kb setup` create the profile only for a new vault (not yet in the configuration and without notes); on a vault in use a missing profile is reported as `missing` with a restore hint, `kb doctor` reports it as an error pointing to a backup, and `kb init --new-profile` creates an empty one on request.
+**Done in v1.10 (roadmap stage 2):** `kb init` and `kb setup` create the profile only for a new vault (not yet in the configuration and without notes); on a vault in use a missing profile is reported as `missing` with a restore hint, `kb doctor` reports it as an error pointing to a backup, and `kb init --new-profile` creates an empty one on request.
 
-Protection of user data in three layers:
+Protection of user data in three layers. The trust boundary is not the skill text but the OS sandbox, `kb` itself (it can only append) and copies the agent cannot reach.
 
-- **Prevent.** The CLI has no delete command and extends append-only (§11). Skills forbid deleting, moving or renaming vault files and any change outside `kb`. Optionally, client permission rules deny direct edits of the vault path (they do not cover shell commands such as `rm`).
-- **Detect.** `kb doctor` / `kb validate` report broken wiki-links (a deleted note leaves dangling `[[...]]` links), and compare the vault with a manifest of notes written by `kb` (kept outside the vault, next to `installed.toml`) to list notes that disappeared.
-- **Recover.** From Git history (§12.3) and/or the cloud copy (§12.1). Whatever the mechanism, a local deletion must never propagate to the copy without an archived version (for `rclone`: `--backup-dir` or `copy`, never a plain `sync`). The copy is updated automatically after each write, not only manually.
+**Prevent.**
+
+- The CLI has no delete command and extends append-only (§11); `kb restore` is a user command and is not exposed to skills.
+- Skills forbid deleting, moving or renaming vault files, any change outside `kb` and running Git in the vault. This is guidance, not protection: documented incidents with coding agents include `rm -rf` of the home directory, deletions inside scripts the agent wrote itself, and `mv` chains that overwrote files.
+- Text permission rules are not a security boundary (Claude Code's documentation: a `Bash(rm *)` deny rule does not catch `/bin/rm` or `bash -c`). The documentation of the package recommends the settings that are: keep the vault outside every agent's working directories; in Claude Code deny `Edit(<vault>/**)`, add the vault to the sandbox's `denyWrite`, set `allowUnsandboxedCommands: false` and let only `kb` run outside the sandbox (`excludedCommands`); in Codex use `workspace-write` without the vault in `writable_roots`; in Cursor enable File-Deletion and External-File Protection. `kb setup` does not change these security settings silently.
+- macOS file flags (`chflags uchg`) are not used: the agent runs as the same user and can clear them, and Obsidian could no longer save.
+
+**Detect.**
+
+- A **manifest** of notes written by `kb` is kept outside the vault, next to `installed.toml`: path → SHA-256, size, mtime, last writer. `kb` updates it after every write (hash after write). The manifest says what must exist; Git and Time Machine say where to bring it back from.
+- `kb doctor` / `kb validate` classify differences: *changed outside `kb`* (normal Obsidian edits, recorded in the manifest), *moved* (the same content found at another path, or a rename detected by Git), *deleted* (found nowhere; check `.trash/` and suggest `kb restore`), *damaged* (text written by `kb` is missing, the file is empty or truncated — for example an Obsidian buffer overwrote an append). A deletion is reported until the user acknowledges it as intentional.
+- **Broken wiki-links** are a second, independent signal. Only a link that used to resolve and no longer does is an alarm; a link to a not-yet-created note is normal in Obsidian. Link resolution is implemented in `kb` (shortest path, aliases), not through third-party libraries.
+- **Freshness.** `kb` keeps a small state file with the last successful commit and push and the last error. `kb doctor` warns when `git` is missing, when writes are newer than the last push by more than a set number of hours, and when the LaunchAgent is not loaded.
+
+**Recover.** `kb restore PATH [--at REV]` returns a note from the vault's Git history and never overwrites silently: if the original path is free, the note goes back there; if it is occupied, the restored version is written next to it as `<name>.restored-<timestamp>.md` and a diff is shown; `--force` overwrites after saving the current version; `--dry-run` shows what would happen. Afterwards the manifest is updated and the restore is committed. If the local repository itself is lost, the vault is cloned from the remote; Time Machine and Obsidian's File recovery (snapshots every 5 minutes, kept 7 days, `.md` only) are additional sources.
+
+### 12.5. After the MVP: other cloud copies and multi-device sync
+
+Researched in stage 4 and moved to the backlog. Kept here so the MVP choice does not block them.
+
+**A second cloud copy** (independent of the Git host):
+
+- **Snapshot backup** (`restic` or Kopia to Backblaze B2 or another store): deduplicated, encrypted, versioned snapshots; a local deletion does not propagate; a single note is restored with `restic restore --include` or `restic dump`. Backblaze B2's first 10 GB are free. Costs: a repository password (losing it loses the data) and a separate account. The preferred option if privacy or a copy outside the Git host becomes important.
+- **Google Drive via `rclone`** (the former §12.1 baseline): only `rclone sync --backup-dir` (or `copy`), never a plain `sync`, so changed and deleted files move into a dated archive. Setup became heavy in 2026: rclone's shared Google client ID is being retired, each user needs their own OAuth client in Google Cloud, and a client left in "Testing" status gets refresh tokens that expire after 7 days, which silently stops the copy.
+- Placing the vault inside a synced folder is not an option (§12, principles).
+
+**Multi-device and phone access** (US-20 target state): one two-way mechanism becomes the vault's sync — Obsidian Sync (the simplest path for iOS: end-to-end encrypted, version history of 1 or 12 months depending on the plan, does not transfer hidden folders except `.obsidian`, so `.git` stays on the Mac) or Syncthing for Android. Git remains one-way history on the Mac — commit and push, never pull — and keeps the long history that the sync service's limited window does not. Rules for that stage: if the connection is lost, local data is preserved; diverging changes are detected; silently losing a version is not allowed. The specific conflict resolution rules are decided then.
 
 ## 13. Versions, CI and package maintenance
 
@@ -679,14 +711,14 @@ Updating the package does not overwrite user Markdown files. Configuration chang
 | Instances | Several separate local KBs per installation (target); one new KB in the MVP | Identifier format and selection of the active KB |
 | Configuration | Each knowledge base has its own source/storage settings; TOML at `~/.config/ms-kb/config.toml` ([note-schema-v0.md](note-schema-v0.md) §6) | Source registry format |
 | Markdown | Five types, metadata, links, attachments; fields and directory structure — [note-schema-v0.md](note-schema-v0.md); `insight` is not a type | — |
-| Provenance | Skill/version, sources, dates, exact rules via a link at the release tag; stamped by the CLI | Note content history |
+| Provenance | Skill/version, sources, dates, exact rules via a link at the release tag; stamped by the CLI; note content history in the vault's Git repository with provenance trailers (§12.1) | — |
 | Search | Selective retrieval instead of loading the whole vault; MVP: text and metadata via `kb search`, no index, used by `kb-recall` (US-08) | Semantic/hybrid after the MVP, model and backend |
 | Access | Direct access to vault files from Claude Code/Codex/Cursor in the MVP; connectors to supporting sources | MCP for remote clients after the MVP |
 | Skills | Shipped with the package and the user scope; portable `SKILL.md` format and install directories — [clients-v0.md](clients-v0.md); MVP skills `add-knowledge` and `kb-recall`; the global instruction as a marked block (§9.1) | Further skills (backlog); Cursor duplicates |
 | Learning profile | Brief context separate from detailed knowledge; format in [note-schema-v0.md](note-schema-v0.md) §5; loaded on demand by `kb-recall` (§10) | — |
 | Writing | Explicit skill invocation only; create/extend without duplication; the CLI writes notes and extends append-only; a plan is shown before existing notes are extended | — |
-| Synchronization | Local vault; cloud copy in Google Drive as a separate step; GitHub excluded for the vault (under reconsideration, §12.3) | Git + private GitHub vs Google Drive vs both (§12.3); how sync is triggered; mobile access (deferred); note change history |
-| Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated (§12.4) | Detection of deleted notes, restore (§12.4) |
+| History and copy | Local vault outside synced folders; its own Git repository with a commit per `kb` write; `kb sync` pushes to a private remote hourly (LaunchAgent) and on demand; Time Machine as the independent local copy (§12, §12.1, §12.3) | The Git host is the user's choice; a second cloud copy and multi-device sync after the MVP (§12.5) |
+| Data integrity | The CLI never deletes and extends append-only; regenerable vs user-data files, the learning profile is never silently recreated; manifest, broken-link and freshness checks, `kb restore` without silent overwrites; the OS sandbox, not the skill text, is the boundary for agents (§12.4) | Exact secret patterns and the size limit; automatic checks of agents' sandbox settings (after the MVP) |
 | ChatGPT | Out of scope at this stage | Possible future paths — §12.2 |
 | Maintenance | Versions and CI | Release process, migrations, whether CD is needed |
 
@@ -706,3 +738,4 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.9 — 2026-10-10:** for further consideration: §12.3 — Git with a private GitHub repository as the vault's history and backup (revises the v1.2 exclusion of GitHub; not decided); §12.4 — data integrity: regenerable vs user-data files, `learning_profile.md` as user data, detection and recovery of deleted notes. Updated §12, §14.
 - **1.10 — 2026-10-10:** §12.4: regenerable vs user-data files implemented for `learning_profile.md` (roadmap stage 2). Updated §14.
 - **1.11 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (§10); the global instruction is a marked block in `CLAUDE.md` / `AGENTS.md`, pasted by hand in Cursor (§9.1); MVP search is text and metadata. Updated §14.
+- **1.12 — 2026-10-10:** roadmap stage 4 research done; storage decided. The vault root is its own Git repository with a commit per `kb` write (§12.1); the off-machine copy is a push to a private remote dedicated to the vault, hourly and on demand, with Time Machine as the local copy (§12.3); the v1.2 exclusion of GitHub is revised, the vault never goes into the package repository (§12). Data integrity decided: manifest, broken-link and freshness checks, `kb restore`, agent sandbox settings (§12.4). Google Drive via `rclone`, snapshot backups and multi-device sync moved after the MVP (§12.5; the former §12.1 baseline). Updated decisions 9 and 17, §2.2, §3, §4.2, §7, §11, §11.1, §14.

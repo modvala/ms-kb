@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — User Stories"
-document_version: "1.10"
+document_version: "1.11"
 created: "2026-10-05"
 updated: "2026-10-10"
 language: en
@@ -8,7 +8,7 @@ status: requirements_baseline
 origin: "Decisions from discussions with the user, consolidated into user stories"
 ---
 
-# Personal Knowledge System — User Stories v1.10
+# Personal Knowledge System — User Stories v1.11
 
 This document records the desired outcome and the decisions made about the personal knowledge base. It does not mean that integrations are already connected or that the system has been implemented. Acceptance criteria turn agreements into verifiable behavior; specific tools and unresolved questions are listed separately.
 
@@ -18,7 +18,7 @@ As a user who studies AI/ML and conducts research together with AI agents, I wan
 
 **Main architectural decision:** Obsidian is the primary and canonical store of accumulated knowledge. Notion, Git/GitHub and other systems provide additional context and functionality. Obsidian's priority as the knowledge base does not override the authority of external systems in their own domains: the current status of a job application comes from the tracker, the state of an implementation comes from the repository.
 
-**Delivery and storage decision:** GitHub hosts the source code of a versioned, installable package: the library, skills, and tools for initialization and connector setup. The package is installed locally; skills are additionally available in the user scope outside the project repository. A single installation can serve several independently initialized knowledge bases. Each knowledge base is a separate local Obsidian vault with its own configuration, connections and separate cloud storage for synchronization. Another user installs the same package and connects their own data. Personal knowledge is not part of the package repository. GitHub is used only for package code: the vault and the knowledge base's Markdown files are not stored on GitHub and are not synced to any repository. Versions and CI are maintained in the repository; whether CD is needed and how it would work is still to be determined.
+**Delivery and storage decision:** GitHub hosts the source code of a versioned, installable package: the library, skills, and tools for initialization and connector setup. The package is installed locally; skills are additionally available in the user scope outside the project repository. A single installation can serve several independently initialized knowledge bases. Each knowledge base is a separate local Obsidian vault with its own configuration, connections, its own Git history and an off-machine copy in a private remote dedicated to it. Another user installs the same package and connects their own data. Personal knowledge is not part of the package repository: the vault and the knowledge base's Markdown files never go into it. A vault's history may be pushed to a separate private repository dedicated to that vault, on GitHub or another Git host (revised in v1.11). Versions and CI are maintained in the repository; whether CD is needed and how it would work is still to be determined.
 
 | Component | Content and purpose |
 |---|---|
@@ -26,7 +26,7 @@ As a user who studies AI/ML and conducts research together with AI agents, I wan
 | Installed package | Reusable tools for working with knowledge bases and initializing them |
 | User skills scope | Access to skills from supported clients and from different working directories |
 | Knowledge base instance | A separate vault, its configuration, profile, sources and connections |
-| Knowledge base sync storage | Data of a specific knowledge base in separate cloud storage (not GitHub) |
+| Knowledge base history and copy | The vault's own Git repository and its private remote (any Git host, never the package repository) |
 
 ## MVP decisions (v1.3)
 
@@ -41,7 +41,7 @@ Requirements US-01…US-23 remain the target state. The first implementation is 
 | Vault access | The listed clients read and write the local vault's Markdown files directly; a dedicated MCP connector to one's own knowledge base is not required for the MVP |
 | Knowledge base | One knowledge base, created from scratch with the package's tools; there is no existing vault. Support for multiple knowledge bases (US-21) is not implemented in the MVP; the architecture must not rule it out |
 | Write policy | Only on explicit skill invocation by the user (US-24); the agent does not save knowledge on its own initiative |
-| Storage and sync | The vault is a local folder outside Google Drive; agents write notes only locally. Syncing with Google Drive is a separate step. The goal is a cloud copy so the knowledge base is not lost to accidental local deletion. The vault and notes do not go into any GitHub repository. Phone access is deferred |
+| Storage and sync | The vault is a local folder outside synced folders; agents write notes only locally. Revised in v1.11: the vault root is its own Git repository with a commit per `kb` write; `kb sync` pushes it to a private remote dedicated to the vault. The goal is to survive accidental local deletion and loss of the computer. Other cloud copies (Google Drive, snapshot backups), multi-device sync and phone access are deferred |
 | Obsidian | Not required for the package and agents to work; needed for convenient reading and navigation, can be installed at any time |
 
 ## 1. Content and boundaries of the knowledge base
@@ -222,7 +222,7 @@ Acceptance criteria:
 - An update of a material under new rules or with new sources can be initiated.
 - New processing is not attributed to the old skill and does not change the original creation date.
 - A dated research result is distinguishable from an updated concept explanation.
-- The specific way of storing note version history and skill snapshots has not yet been chosen.
+- Note version history is the vault's Git repository, one commit per `kb` write with provenance (decided in v1.11, design §12.1); skill snapshots are not kept, `skill_ref` points to the release tag.
 - Regular automatic rebuilds are not part of the approved requirements.
 
 ## 4. Additional sources and portability
@@ -317,25 +317,27 @@ Acceptance criteria:
 - Deleting the checkout or reinstalling the library does not delete the vault.
 - Local search and work with already available notes do not require synchronization on every access; external sources may require a network.
 
-### US-20. Syncing the knowledge base through separate storage
+### US-20. Protecting the knowledge base and copying it outside the computer
 
-**As a user, I want to sync a separate local knowledge base with separate cloud storage unrelated to GitHub so that the data is preserved independently of the library repository and is available on other devices.**
+**As a user, I want my local knowledge base to have its own change history and an off-machine copy, kept apart from the package repository, so that accidental deletion or loss of the computer does not destroy my knowledge, and so that other devices can be added later.**
 
-Acceptance criteria:
+Acceptance criteria (MVP, decided in v1.11; design §12):
 
-- The distribution provides and documents synchronization through the chosen cloud storage.
-- The vault, notes and attachments are not stored or synced via GitHub — neither in the library repository nor in a separate repository.
-- One synchronization mechanism is used per vault; support for multiple providers is not required, and the specific option is chosen before implementation.
-- Notes and necessary attachments are synced; canonical knowledge does not depend on transferring a derived search index, which can be rebuilt.
-- Local changes are pushed to the chosen storage, and remote changes can be pulled locally.
-- Synchronization is not replaced by one-way backup; backup, if needed, is considered separately.
-- When local and remote changes diverge, the conflict is detected and resolved according to defined rules without silently losing one of the versions.
-- If the storage is temporarily unavailable, local data is preserved; once access is restored, synchronization can continue.
-- User access settings are not included in the distributed library repository.
-- MVP: the vault is stored in a local folder outside Google Drive; notes are always written locally. Syncing with Google Drive is done as a separate step and does not affect writing. The main goal is a cloud copy so the knowledge base is not lost to accidental local deletion.
-- Accidental local deletion does not destroy the cloud copy; previous versions of changed and deleted files can be restored.
-- The mechanism (a one-way `kb sync` via `rclone` is recommended) and how it is triggered are refined during implementation.
-- Access to the knowledge base from a phone and other devices is deferred and not part of the MVP.
+- The vault has its own change history: the vault root is a separate Git repository, never the package repository or a project repository. Every `kb` write is a commit that carries provenance; changes made outside `kb` are recorded in separate commits.
+- A deleted or damaged note is detected by `kb doctor` and can be restored from history without silently overwriting a newer version.
+- The vault has an off-machine copy: `kb sync` pushes its history to a private remote dedicated to this vault (the Git host is the user's choice), on a schedule and on demand. Pushing never blocks writing a note.
+- Accidental local deletion does not destroy the copy: a deletion is just another commit, previous versions stay in the history; `kb` never force-pushes.
+- If the remote is temporarily unavailable, local data and history are preserved; the next sync pushes what has accumulated.
+- Notes containing secrets are not written or pushed; large attachments are not committed and are reported.
+- Notes and necessary attachments are copied; canonical knowledge does not depend on transferring a derived search index, which can be rebuilt.
+- User access settings (remote, keys) are not included in the distributed package repository.
+- The vault is kept outside folders synced by iCloud Drive, Google Drive, Dropbox or OneDrive.
+
+After the MVP (target state):
+
+- Access to the knowledge base from a phone and other devices through one two-way sync mechanism; at most one such mechanism per vault, while the Git history stays one-way.
+- Local changes are pushed to the sync storage, and remote changes can be pulled locally; when local and remote changes diverge, the conflict is detected and resolved according to defined rules without silently losing one of the versions.
+- A second cloud copy independent of the Git host (a snapshot backup or Google Drive) may be added.
 
 ### US-21. Initializing multiple independent knowledge bases
 
@@ -397,7 +399,8 @@ Acceptance criteria:
 | "Install the project on my computer" | Install the package with skills from the GitHub project and separately initialize a knowledge base | The installed package and the user's knowledge base are independent |
 | "Use the knowledge skill in another repository" | Load the skill from the user scope and access the configured vault | The skill does not depend on the current repository |
 | "Update the library" | Update the tools without changing personal knowledge | The vault stays independent of the update |
-| "Sync my knowledge" | Exchange changes with the chosen separate storage and flag conflicts | Separate cloud storage (not GitHub) |
+| "Sync my knowledge" | Commit outside edits and push the vault's history to its private remote; report what failed | The vault's own Git repository and its remote (never the package repository) |
+| "I accidentally deleted a note" | `kb doctor` reports the deletion; `kb restore` returns the note from history without overwriting a newer version | The vault's Git history |
 | "Create a second knowledge base" | Initialize a new instance with separate settings and storage | A separate vault; the installed package is reused |
 | "Another user wants to install the system" | Install the same package, create/connect their knowledge base and their connector | The data and configuration belong to that user |
 | "Release a new version of the package" | Verify the package in CI and prepare a versioned release | The package repository; personal knowledge bases are not part of the release |
@@ -412,11 +415,11 @@ These items are not considered accepted technical decisions:
 4. ~~Folder structure and metadata schema~~ — decided in v1.8: [note-schema-v0.md](note-schema-v0.md). Open: the source registry format.
 5. ~~The minimal set of skills and entry instructions~~ — decided in v1.10: `add-knowledge` and `kb-recall`; the global instruction is a marked block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, pasted by hand into Cursor User Rules ([clients-v0.md](clients-v0.md) §2). Open: further skills (backlog).
 6. ~~Write policy~~ — decided in v1.3: only on explicit skill invocation (US-24). ~~Plan before editing~~ — decided in v1.9: new notes are created right away; before existing notes are extended, the agent shows a plan and waits for confirmation (design §11).
-7. Storage of note history, exact skill versions and provenance changes.
+7. ~~Storage of note history~~ — decided in v1.11: the vault's own Git repository, a commit per `kb` write with provenance (design §12.1); exact skill versions via `skill_ref` at the release tag (v1.8).
 8. ~~MVP scope~~ — decided in v1.3 (see "MVP decisions"). Open: the order in which additional sources are connected.
 9. ~~Language and package manager~~ — decided in v1.3: Python + `uv`, installation from GitHub. ~~Install/update scheme~~ — decided in v1.5: `uv tool install` + `setup`, updating in a single command. Open: final command names.
 10. ~~User skills directories~~ — decided in v1.8: [clients-v0.md](clients-v0.md). Open: how Cursor handles duplicate skills.
-11. ~~Sync provider~~ — decided: not GitHub (v1.4), Google Drive (v1.5), local vault, sync as a separate step (v1.6). Open: the mechanism (`rclone` is recommended), how it is triggered, phone access (deferred), note change history.
+11. ~~Sync provider~~ — revised in v1.11 after the stage 4 research: history and the off-machine copy are a separate Git repository of the vault pushed to a private remote, hourly and on demand (design §12). Google Drive via `rclone`, snapshot backups, multi-device sync and phone access come after the MVP. Open: the Git host (the user's choice).
 14. Connecting ChatGPT — outside the current scope; revisit after the MVP (options are in design §12.2).
 12. ~~Configuration format~~ — decided in v1.8: TOML at `~/.config/ms-kb/config.toml`; skills find the vault by calling the `kb` CLI ([note-schema-v0.md](note-schema-v0.md) §6).
 13. The specific CI, versioning and migration policy, the release process and whether automatic publishing/CD is needed.
@@ -427,16 +430,16 @@ These items are not considered accepted technical decisions:
 - The knowledge base must not become an archive of copies of websites, trackers and repositories.
 - Loading the whole vault into every request is not intended.
 - Mentioning an integration in the registry does not mean it is connected and available.
-- Personal knowledge is not shipped inside the library repository and is not stored on GitHub; the vault is synced only through separate cloud storage.
+- Personal knowledge is never shipped inside the library repository; the vault's history lives in its own Git repository and is copied only to a private remote dedicated to that vault.
 - Installing user skills and giving a remote client access to the local knowledge base are different tasks.
-- Supporting two sync providers at once is not a prerequisite for the first implementation.
+- Supporting two sync providers at once is not a prerequisite for the first implementation; a vault has at most one two-way sync mechanism.
 - Each knowledge base instance has its own configuration and data; the shared package does not automatically merge knowledge from different knowledge bases.
 - Maintaining CI and versions is part of the project requirements; automatic publishing/CD is not yet mandatory.
 - This document records requirements; it does not install skills, plugins or connections.
 
 ## Expected outcome
 
-The user gets a versioned package maintained on GitHub, with a library, skills, knowledge base initialization and CI. After a local install, they can create several independent knowledge bases or connect existing vaults, with each instance having its own configuration, connectors and cloud sync storage. Other users install the same package and work with their own data. Skills are available in the user scope of supported clients; personal knowledge is not part of the repository or the package release.
+The user gets a versioned package maintained on GitHub, with a library, skills, knowledge base initialization and CI. After a local install, they can create several independent knowledge bases or connect existing vaults, with each instance having its own configuration, connectors, history and off-machine copy. Other users install the same package and work with their own data. Skills are available in the user scope of supported clients; personal knowledge is not part of the repository or the package release.
 
 The knowledge base is convenient to read and extend both directly and through connected agents. Agents find relevant previously studied material, save useful summaries and research with provenance, and turn to additional sources for current statuses and implementations. The next discussion can continue from the accumulated knowledge without re-explaining the whole history.
 
@@ -453,3 +456,4 @@ The knowledge base is convenient to read and extend both directly and through co
 - **1.8 — 2026-10-09:** roadmap stage 0: open questions 4, 10 and 12 decided with links to `note-schema-v0.md` and `clients-v0.md`.
 - **1.9 — 2026-10-09:** roadmap stage 2: open question 6 decided (a plan before extending existing notes).
 - **1.10 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (US-09); open questions 3, 5 and 10 decided for the MVP (text and metadata search, the `kb-recall` skill, the global instruction per client).
+- **1.11 — 2026-10-10:** roadmap stage 4 research: the vault gets its own Git history and a push to a private remote dedicated to it, revising the v1.4 exclusion of GitHub (the package repository still never holds notes). US-20 rewritten around history, restore and the off-machine copy; two-way multi-device sync kept as the post-MVP target. Updated the storage decision, MVP decisions, US-13, scenarios, open questions 7 and 11, boundaries.

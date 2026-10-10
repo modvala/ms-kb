@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Note Schema, Vault Structure and Configuration v0"
-document_version: "0.3"
+document_version: "0.4"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.11"
+design_version: "1.12"
 ---
 
 # Note schema, vault structure and configuration v0
@@ -144,15 +144,16 @@ vault_path = "~/Knowledge/main"
 [clients]
 enabled = ["claude-code", "codex", "cursor"]
 
-# Stage 4:
+# Stage 4 (design §12.3): kb sync pushes the vault's own Git repository
 # [kbs.main.sync]
-# provider = "rclone"
-# remote = "gdrive:kb-backup/main"
+# provider = "git"
+# remote = "origin"
 ```
 
 - `schema_version` is the configuration schema version (design §7), independent of the package version. A change requires a migration path.
 - The MVP uses one knowledge base (`default_kb`), but the `[kbs.<name>]` shape already allows several (US-21) without a migration.
-- `vault_path` may use `~`; the CLI expands it.
+- `vault_path` may use `~`; the CLI expands it. Keep the vault outside folders synced by iCloud Drive, Google Drive, Dropbox or OneDrive (design §12).
+- `[kbs.<name>.sync]` (stage 4): `provider = "git"` and `remote`, the name of a remote in the vault's own Git repository that `kb sync` pushes to (design §12.3). Credentials are never stored here.
 - The list of skills installed by the CLI and their versions is kept separately, in `~/.config/ms-kb/installed.toml` (stage 2). It is state, not settings.
 - **Skills never read this file.** They call the CLI (for example, `kb where` in stage 1, `kb search` in stage 2). The file format stays internal to the CLI, and skills do not depend on the current working folder (US-18).
 
@@ -187,3 +188,4 @@ Warnings:
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
 - **0.2 — 2026-10-09:** roadmap stage 2: unquoted dates accepted; slug rule for non-ASCII titles; §7 describes the writing commands, duplicate rules and where skill versions come from; the learning profile is user data (§5).
 - **0.3 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall`, `## Known topics` is filled by `add-knowledge`, `kb doctor` warns above 150 lines (§5).
+- **0.4 — 2026-10-10:** the planned `[kbs.<name>.sync]` section uses `provider = "git"` with a remote of the vault's own repository instead of `rclone` (design §12.3).
