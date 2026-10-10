@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.6"
+document_version: "1.7"
 created: "2026-10-09"
 language: en
 status: draft
 requirements_ref: "personal-knowledge-user-stories-v1.md"
-requirements_version: "1.8"
+requirements_version: "1.10"
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.10"
+design_version: "1.11"
 ---
 
-# Personal Knowledge System — Roadmap v1.6
+# Personal Knowledge System — Roadmap v1.7
 
 ## 1. Purpose
 
@@ -27,7 +27,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 | 0. Skeleton and checks | v0.1 | ✅ Done | Package installs from GitHub, `kb --version` works; skills directories verified in all three clients; note schema approved | US-04, US-17, US-23 |
 | 1. Knowledge base | v0.2 | ✅ Done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ✅ Done | Conversation outcomes are saved to the knowledge base (checked in Claude Code; Codex and Cursor in stage 5), with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
-| 3. Reading: `kb-recall` | v0.4 | ⬜ Not done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
+| 3. Reading: `kb-recall` | v0.4 | ✅ Done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
 | 4. Updates and data protection | v0.5 | ⬜ Not done | `kb update` in a single command; research on vault storage done (separate Git repository vs Google Drive vs no cloud copy); deleted notes are detected and restored; `kb sync` only if the research chooses a remote copy | US-13, US-17, US-18, US-20 |
 | 5. Stabilization | v1.0 | ⬜ Not done | CI on typical scenarios, provenance queries, documentation; the MVP is ready for daily use | US-12, US-13, US-23 |
 | Later | v1.x+ | — | Extensions from the backlog (§4) | US-02, US-03, US-05, US-06, US-14, US-21, US-22 |
@@ -90,7 +90,14 @@ Work:
 
 ### Stage 3. Reading: `kb-recall` → v0.4
 
-**Status:** ⬜ Not done
+**Status:** ✅ Done (v0.4.0, 2026-10-10). Checked hands-on in Claude Code ([clients-v0.md](clients-v0.md) §4.2); Codex and Cursor in stage 5. Implemented:
+
+- the `kb-recall` skill (read-only; profile first, then 1–3 `kb search` calls and up to about 5 notes);
+- the global instruction as a marked block in `~/.claude/CLAUDE.md` and `$CODEX_HOME/AGENTS.md`, written by `kb setup` / `kb install-skills`; Cursor gets text to paste;
+- `kb doctor` checks the block and warns about a long profile;
+- `add-knowledge` 0.4.0 adds new concepts to `## Known topics`.
+
+Decided: the profile is loaded on demand by `kb-recall`, never automatically (design §10); MVP search is text and metadata.
 
 **Goal:** the next conversation continues the accumulated work.
 
@@ -138,7 +145,7 @@ Work:
 Work:
 
 - CI on test data: installation, `init`, skills installation, writing and validating notes, independence from personal data (US-23).
-- Hands-on check of all skills (`add-knowledge`, `kb-recall`), the global instruction and `kb update` in Codex and Cursor together, deferred from stages 2–4; results go to [clients-v0.md](clients-v0.md). Includes whether Cursor shows duplicate skills and which environment variables identify Codex and Cursor for `agent` in provenance.
+- Hands-on check of all skills (`add-knowledge`, `kb-recall`), the global instruction and `kb update` in Codex and Cursor together, deferred from stages 2–4, plus `kb-recall` with `kb` unavailable in all three clients; results go to [clients-v0.md](clients-v0.md). Includes whether Cursor shows duplicate skills and which environment variables identify Codex and Cursor for `agent` in provenance.
 - Provenance queries: `kb search --skill --version`, finding research as of a date (US-12, US-13).
 - Versioning policy and release history (changelog), configuration migration path.
 - Documentation: installation, updating, first run, restoring deleted notes.
@@ -184,3 +191,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.4 — 2026-10-10:** stage 2: `learning_profile.md` treated as user data. Stage 4: a design decision on sync and data integrity (Git/GitHub and/or Google Drive, design §12.3–§12.4) before implementing `kb sync`, plus detection and restore of deleted notes. Design reference updated to 1.9.
 - **1.5 — 2026-10-10:** stage 2 done: package `v0.3.0` with `kb search`, `kb new`, `kb extend`, `kb validate`, `kb install-skills` and the `add-knowledge` skill; `learning_profile.md` as user data; checked hands-on in Claude Code; hands-on checks in Codex and Cursor moved to stage 5, where all skills are checked in those clients together. Design reference updated to 1.10.
 - **1.6 — 2026-10-10:** stage 4 renamed "Updates and data protection": cloud sync is no longer a committed result. Stage 4 starts with research on vault storage, split into change history (a separate Git repository for the vault), an off-machine copy (needed or not; private remote vs Google Drive) and multi-device sync (backlog). `kb sync` is implemented only if a remote copy is chosen. MVP scope, risks and backlog updated.
+- **1.7 — 2026-10-10:** stage 3 done: package `v0.4.0` with the `kb-recall` skill, the global instruction and the learning profile loaded on demand; checked hands-on in Claude Code. The "`kb` unavailable" check and the Codex/Cursor checks move to stage 5. Design reference updated to 1.11, requirements to 1.10.

@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Client Skills and Instructions v0"
-document_version: "0.2"
+document_version: "0.3"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.7"
+design_version: "1.11"
 ---
 
 # Client skills and instructions v0
@@ -42,6 +42,7 @@ Sources: [Claude Code skills](https://code.claude.com/docs/en/skills), [Claude C
 4. **Global instruction.**
    - Claude Code and Codex: `kb setup` adds a block between markers `<!-- ms-kb:begin -->` / `<!-- ms-kb:end -->` to `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and replaces only that block on update. Codex respects `CODEX_HOME`.
    - Cursor: there is no file for User Rules. `kb setup` prints the text to paste into Settings → Rules. Without it, `kb-recall` still works through its `description`. This is a known gap for US-15.
+   - **Implemented in v0.4.0 (stage 3).** `kb setup` and `kb install-skills` write the block together with the skills (`--no-instructions` skips it, `--dry-run` shows it); the begin marker carries the package version. The block is appended to existing content, replaced in place on update and removed when a client is disabled; text outside the markers is never changed. The written files are recorded under `[instructions]` in `installed.toml`. `kb install-skills --print-instruction` prints the Cursor text again. `kb doctor` reports a missing or outdated block and warns when `$CODEX_HOME/AGENTS.override.md` exists, because Codex reads it instead of `AGENTS.md`.
 5. **Versions in provenance.** The model does not report skill versions (in Claude Code it does not even see the frontmatter, §3). The CLI knows the version of each installed skill from `installed.toml` and stamps it itself (note schema §3). `metadata.version` in `SKILL.md` is for humans and for `kb doctor`.
 6. **Agent in provenance.** The CLI fills `agent` only from environment variables seen hands-on in the client's shell: Claude Code sets `CLAUDECODE=1` (verified in the desktop Code tab; it also sets `AI_AGENT=claude-code_<version>_agent`). Codex and Cursor are checked in stage 2; until a variable is confirmed, `agent` is omitted.
 
@@ -59,7 +60,9 @@ The probe skill `kb-hello` was placed in `~/.claude/skills/kb-hello/` and `~/.ag
 
 Result: each of the two install directories is read by exactly one of the two clients, so Claude Code and Codex get one copy each. The probe copies were deleted after the check.
 
-## 4. Hands-on check (stage 2)
+## 4. Hands-on checks
+
+### 4.1. Stage 2: `add-knowledge`
 
 `add-knowledge` 0.3.0 was installed with `kb setup` and run on a real learning conversation.
 
@@ -74,6 +77,20 @@ Result: each of the two install directories is read by exactly one of the two cl
 Codex and Cursor are checked later, together with the other skills, in roadmap stage 5.
 
 Found and fixed during the check: `kb validate` took paths relative to the current folder instead of the vault, and checked `learning_profile.md` as a note.
+
+### 4.2. Stage 3: `kb-recall` and the global instruction
+
+`kb-recall` 0.4.0 and the global instruction installed with `kb install-skills`, run against the vault from §4.1 in a new conversation in an unrelated repository (Claude Code desktop Code tab, 2026-10-10).
+
+| Check | Claude Code | Codex | Cursor |
+|---|---|---|---|
+| Global instruction block in place, other content untouched | yes: created `~/.claude/CLAUDE.md` (no file before); `kb doctor` ok | pending | pasted by hand: pending |
+| "Let's continue studying <saved topic>": `kb-recall` triggers, reads the profile and a few notes, cites conclusions and open questions with paths | yes: the request was in Russian and the skill triggered on it unprompted; 3 `kb` calls, profile + 2 sessions + 2 concepts; assumptions kept marked, its own new explanation labelled as not from the notes | pending | pending |
+| A simple question ("what is 15 × 18?") runs no `kb` command | yes | pending | pending |
+| An unsaved topic: says nothing was found, invents no history | yes (forced `/kb-recall` on an unrelated question) | pending | pending |
+| `kb` unavailable: says so and answers from the conversation only | not checked; moved to stage 5 | pending | pending |
+
+Codex and Cursor are checked in roadmap stage 5.
 
 ## 5. Portable `SKILL.md` v0
 
@@ -99,3 +116,4 @@ metadata:
 
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
 - **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6); hands-on results of `add-knowledge` (§4).
+- **0.3 — 2026-10-10:** roadmap stage 3: the global instruction implemented (§2.4); the hands-on check of `kb-recall` (§4.2).
