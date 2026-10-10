@@ -20,6 +20,17 @@ def isolated_home(tmp_path, monkeypatch):
     return home
 
 
+@pytest.fixture(autouse=True)
+def isolated_git(tmp_path, monkeypatch):
+    """Never read the user's Git configuration (signing, hooks, identity)."""
+    gitconfig = tmp_path / "gitconfig"
+    gitconfig.write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def vault(tmp_path):
     """A configured vault with skills installed for Claude Code and Codex."""

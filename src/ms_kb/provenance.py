@@ -52,3 +52,15 @@ def stamp(skill: str, day: str, summary: str | None = None) -> tuple[CommentedMa
     if summary is not None:
         entry["summary"] = q(summary)
     return entry, [warning] if warning else []
+
+
+def trailers(skill: str | None) -> dict[str, str]:
+    """Git trailers for a kb commit: the same provenance as the note (design §12.1)."""
+    result = {}
+    if skill:
+        result["Kb-Skill"] = skill
+        result["Kb-Skill-Version"] = provenance_versions(skill)[0]
+    result["Kb-Version"] = __version__
+    if agent := detect_agent():
+        result["Kb-Agent"] = agent
+    return result

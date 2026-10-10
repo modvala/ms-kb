@@ -30,6 +30,7 @@ def _vault_files() -> dict[str, str]:
     """Regenerable files: relative path in the vault -> content to write if missing."""
     result = {f"templates/{t}.md": _template(f"{t}.md") for t in NOTE_TEMPLATES}
     result["README.md"] = _template("vault-README.md")
+    result[".gitignore"] = _template("vault-gitignore")
     return result
 
 
@@ -77,10 +78,3 @@ def check_vault(path: Path) -> tuple[list[str], list[str]]:
     lost = [rel for rel in _user_files() if not (path / rel).exists()]
     return missing, lost
 
-
-def git_work_tree(path: Path) -> Path | None:
-    """The enclosing Git work tree of `path`, if any."""
-    for p in [path, *path.parents]:
-        if (p / ".git").exists():
-            return p
-    return None

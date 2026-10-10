@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 
 import pytest
 
@@ -157,11 +158,21 @@ def test_extend_missing_profile_points_to_doctor(tmp_path, capsys):
     assert "kb doctor" in capsys.readouterr().err
 
 
-def test_doctor_warns_about_git(tmp_path, capsys):
-    (tmp_path / ".git").mkdir()
-    setup_vault(tmp_path)
+def test_doctor_warns_about_foreign_repository(tmp_path, capsys):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    vault = setup_vault(tmp_path)
+    assert not (vault / ".git").exists()
+    capsys.readouterr()
     assert main(["doctor"]) == 0
-    assert "warn" in capsys.readouterr().out
+    assert f"warn  history: the vault is inside the Git repository {tmp_path.resolve()}" in capsys.readouterr().out
+
+
+def test_doctor_accepts_own_repository(tmp_path, capsys):
+    vault = setup_vault(tmp_path)
+    assert (vault / ".git").is_dir()
+    capsys.readouterr()
+    assert main(["doctor"]) == 0
+    assert "ok    history: the vault is its own Git repository" in capsys.readouterr().out
 
 
 def test_where(tmp_path, capsys):

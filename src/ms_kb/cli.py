@@ -19,7 +19,11 @@ from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills
 from ms_kb.instructions import check_instructions, install_instructions, instruction_text
-from ms_kb.vault import check_vault, git_work_tree, has_notes, init_vault
+from ms_kb import history, vaultstate
+from ms_kb.history import GitError
+from ms_kb.provenance import trailers
+from ms_kb.secretscan import find_secrets
+from ms_kb.vault import check_vault, has_notes, init_vault
 from ms_kb.write import WriteError, extend_note, new_note, save
 
 DEFAULT_KB = "main"
@@ -36,14 +40,19 @@ def _warn(message: str) -> None:
     print(f"kb: warning: {message}", file=sys.stderr)
 
 
-def _vault() -> Path:
+def _kb() -> tuple[str, Path, KbConfig]:
+    """(name, resolved vault path, settings) of the default knowledge base."""
     cfg = load_config()
     if cfg is None:
         raise ConfigError("no configuration; run kb setup")
-    vault = cfg.default().vault
-    if not vault.is_dir():
-        raise ConfigError(f"vault not found at {vault}; run kb init")
-    return vault.resolve()
+    kb = cfg.default()
+    if not kb.vault.is_dir():
+        raise ConfigError(f"vault not found at {kb.vault}; run kb init")
+    return cfg.default_kb, kb.vault.resolve(), kb
+
+
+def _vault() -> Path:
+    return _kb()[1]
 
 
 def _normalize(vault: str) -> str:
@@ -84,12 +93,29 @@ def _init_kb(
     for rel, status in init_vault(path, user_files=fresh or new_profile):
         hint = f" ({PROFILE_HINT})" if status == "missing" else ""
         print(f"  {status:8} {rel}{hint}")
+    _init_history(path.resolve())
     if cfg is None:
         cfg = Config(default_kb=name)
     cfg.kbs[name] = KbConfig(vault_path=vault)
     if clients is not None:
         cfg.clients = clients
     print(f"Configuration: {save_config(cfg)}")
+
+
+def _report_excluded(excluded: list[tuple[str, str]], level: str = "warning") -> None:
+    for rel, reason in excluded:
+        print(f"kb: {level}: not committed: {rel}: {reason}", file=sys.stderr)
+
+
+def _init_history(vault: Path) -> None:
+    """Make the vault its own Git repository (design §12.1); never fails the init."""
+    try:
+        status, message, commit = history.ensure_repo(vault)
+    except GitError as e:
+        _warn(f"history: {e}")
+        return
+    print(f"History: {message}" + (f" ({commit.rev})" if commit.rev else ""))
+    _report_excluded(commit.excluded)
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -203,8 +229,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             report("warn", f"{PROFILE} has {n} lines (target under {PROFILE_MAX_LINES}); trim it in Obsidian")
         if not missing and not lost:
             report("ok", "vault structure complete")
-        if repo := git_work_tree(vault):
-            report("warn", f"vault is inside a Git work tree ({repo}); keep the vault out of Git")
+        status, root = history.repo_status(vault)
+        if status == "own":
+            report("ok", "history: the vault is its own Git repository")
+        elif status == "foreign":
+            report("warn", f"history: the vault is inside the Git repository {root}; "
+                           "move it out so it gets its own history")
+        elif status == "none":
+            report("warn", "history: the vault has no Git repository; run kb init")
+        else:
+            report("error", "history: git not found; install it with xcode-select --install")
 
     unknown = [c for c in cfg.clients if c not in KNOWN_CLIENTS]
     if unknown:
@@ -304,7 +338,51 @@ def _read_body(path: str | None) -> str | None:
     return Path(path).expanduser().read_text(encoding="utf-8")
 
 
-def _finish(result, dry_run: bool) -> int:
+def _check_secrets(result, allow: bool) -> None:
+    """Refuse key-like strings in what this write adds (design §12.1)."""
+    if allow or result.action == "unchanged":
+        return
+    found = find_secrets(result.text, result.original)
+    if found:
+        raise WriteError(
+            [f"{result.rel}: {f'line {n}: ' if n else ''}looks like a secret ({kind}); notes must not contain secrets"
+             for n, kind in found]
+            + ["remove it and run the command again (if it is not a secret, the user can pass --allow-secret-like)"]
+        )
+
+
+def _commit(vault: Path, state: dict, rels: list[str], subject: str, extra: dict | None = None,
+            skill: str | None = None) -> None:
+    """Commit kb's own write; a Git problem is a warning, never a failed write (design §12.1)."""
+    try:
+        status, _ = history.repo_status(vault)
+        if status != "own":
+            if status != "foreign":
+                _warn("the vault has no Git history yet; run kb init")
+            return
+        commit = history.commit_write(vault, rels, subject, trailers(skill) | (extra or {}))
+        vaultstate.git_ok(state, "last_commit", commit.rev)
+    except GitError as e:
+        _warn(f"written but not committed: {e}")
+        vaultstate.git_failed(state, str(e))
+
+
+def _commit_external(vault: Path, state: dict) -> list[tuple[str, str]]:
+    """Commit outside edits before kb writes; returns the files left out."""
+    try:
+        if history.repo_status(vault)[0] != "own":
+            return []
+        commit = history.commit_external(vault)
+        if commit.committed:
+            vaultstate.git_ok(state, "last_commit", commit.rev)
+        return commit.excluded
+    except GitError as e:
+        _warn(f"outside edits not committed: {e}")
+        vaultstate.git_failed(state, str(e))
+        return []
+
+
+def _finish(result, dry_run: bool, skill: str | None = None, allow_secret: bool = False) -> int:
     for w in result.warnings:
         _warn(w)
     if result.skipped:
@@ -312,11 +390,20 @@ def _finish(result, dry_run: bool) -> int:
     if result.action == "unchanged":
         print(f"unchanged {result.rel}")
         return 0
+    _check_secrets(result, allow_secret)
     if dry_run:
         print(f"would be {result.action} {result.rel}")
         print(result.text, end="")
         return 0
-    save(result)
+    name, vault, _ = _kb()
+    with vaultstate.lock(name):
+        state = vaultstate.load(name)
+        _report_excluded(_commit_external(vault, state))
+        save(result)
+        verb = "create" if result.action == "created" else "extend"
+        _commit(vault, state, [result.rel], f"kb: {verb} {result.rel}", skill=skill)
+        vaultstate.record(state, vault, result.rel, f"kb {verb}")
+        vaultstate.save(name, state)
     sections = f" (sections: {', '.join(result.sections)})" if result.sections else ""
     print(f"{result.action} {result.rel}{sections}")
     return 0
@@ -339,7 +426,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         skill=args.skill,
         allow_similar=args.allow_similar,
     )
-    return _finish(result, args.dry_run)
+    return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
 
 
 def cmd_extend(args: argparse.Namespace) -> int:
@@ -356,7 +443,7 @@ def cmd_extend(args: argparse.Namespace) -> int:
         sources=args.source,
         skill=args.skill,
     )
-    return _finish(result, args.dry_run)
+    return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
 
 
 def _note_arg(vault: Path, arg: str) -> Path:
@@ -395,6 +482,33 @@ def cmd_validate(args: argparse.Namespace) -> int:
         warnings += len(report.warnings)
     print(f"{checked} note(s), {errors} error(s), {warnings} warning(s)")
     return 1 if errors else 0
+
+
+def _rel_arg(vault: Path, arg: str) -> str:
+    path = _note_arg(vault, arg)
+    try:
+        return path.relative_to(vault).as_posix()
+    except ValueError:
+        raise ConfigError(f"{arg} is outside the vault {vault}") from None
+
+
+def cmd_history(args: argparse.Namespace) -> int:
+    _, vault, _ = _kb()
+    if history.repo_status(vault)[0] != "own":
+        return _error("the vault has no Git history; run kb init")
+    rel = _rel_arg(vault, args.path) if args.path else None
+    entries = history.log(vault, rel, args.deleted, args.limit)
+    if not entries:
+        print("No history." if not args.deleted else "No deleted files in the history.")
+    for e in entries:
+        skill = f"  [{e.skill}]" if e.skill else ""
+        print(f"{e.rev}  {e.date}  {e.subject}{skill}")
+        if args.deleted or not rel:
+            for status, path in e.files:
+                print(f"    {status:4} {path}")
+    if args.deleted and entries:
+        print("Restore one with: kb restore PATH")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -459,6 +573,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--body-file", metavar="FILE", help="Markdown body; - reads stdin (default: the type template)")
     p.add_argument("--skill", help="stamp provenance for this skill, e.g. add-knowledge")
     p.add_argument("--allow-similar", action="store_true", help="create even if notes with similar titles exist")
+    p.add_argument("--allow-secret-like", action="store_true",
+                   help="write even if the text looks like it contains a key or token (for the user, not skills)")
     p.add_argument("--dry-run", action="store_true", help="print the note instead of writing it")
     p.set_defaults(func=cmd_new)
 
@@ -471,12 +587,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--related", action="append", default=[])
     p.add_argument("--source", action="append", default=[])
     p.add_argument("--skill", help="add an updates entry for this skill, e.g. add-knowledge")
+    p.add_argument("--allow-secret-like", action="store_true",
+                   help="write even if the text looks like it contains a key or token (for the user, not skills)")
     p.add_argument("--dry-run", action="store_true", help="print the result instead of writing it")
     p.set_defaults(func=cmd_extend)
 
     p = sub.add_parser("validate", help="check notes against the schema")
     p.add_argument("paths", nargs="*", help="notes to check (default: the whole vault)")
     p.set_defaults(func=cmd_validate)
+
+    p = sub.add_parser("history", help="the vault's change history (Git), including deleted notes")
+    p.add_argument("path", nargs="?", help="a note, also a deleted one (default: all changes)")
+    p.add_argument("--deleted", action="store_true", help="only commits that deleted files")
+    p.add_argument("--limit", type=int, default=20, help="maximum commits (default 20, 0 = all)")
+    p.set_defaults(func=cmd_history)
     return parser
 
 

@@ -1,0 +1,6 @@
+# Written by kb init (design §12.1). Obsidian's churn and temporary files.
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
+.DS_Store
+*.ms-kb-tmp

@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from ms_kb.vault import NOTE_TEMPLATES, VAULT_DIRS, check_vault, git_work_tree, has_notes, init_vault
+from ms_kb.vault import NOTE_TEMPLATES, VAULT_DIRS, check_vault, has_notes, init_vault
 
 # note-schema-v0 §1–§2
 COMMON_FIELDS = {"type", "title", "created", "updated", "topics"}
@@ -96,9 +96,3 @@ def test_templates_show_mermaid_and_attachments(tmp_path):
     concept = (tmp_path / "templates" / "concept.md").read_text()
     assert "```mermaid" in concept
     assert "![[" in concept
-
-
-def test_git_work_tree(tmp_path):
-    (tmp_path / "repo" / ".git").mkdir(parents=True)
-    assert git_work_tree(tmp_path / "repo" / "vault") == tmp_path / "repo"
-    assert git_work_tree(tmp_path / "elsewhere") != tmp_path / "repo"
