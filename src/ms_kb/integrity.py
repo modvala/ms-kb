@@ -6,6 +6,7 @@ the learning profile is tracked, whoever wrote it.
 """
 
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -78,15 +79,16 @@ def check(vault: Path, state: dict) -> list[Finding]:
     new = {rel: fingerprint(vault / rel) for rel in current if rel not in notes}
     for rel, before in sorted(notes.items()):
         path = vault / rel
+        arg = shlex.quote(rel)  # paths in hints must paste into a shell as they are
         if path.is_file():
             now = fingerprint(path)
             if now["sha256"] == before["sha256"]:
                 continue
             if reason := damage(path, now, before):
                 findings.append(Finding("error", "damaged", rel,
-                                        f"{rel} looks damaged: {reason}; compare with kb history {rel}, "
-                                        f"bring it back with kb restore {rel} --force, "
-                                        f"or accept it with kb doctor --ack {rel}"))
+                                        f"{rel} looks damaged: {reason}; compare with kb history {arg}, "
+                                        f"bring it back with kb restore {arg} --force, "
+                                        f"or accept it with kb doctor --ack {arg}"))
                 continue
             notes[rel] = now | {"writer": "external"}
             continue
@@ -100,8 +102,8 @@ def check(vault: Path, state: dict) -> list[Finding]:
         trash = vault / ".trash" / path.name
         where = " (a copy is in Obsidian's .trash/)" if trash.is_file() else ""
         findings.append(Finding("error", "deleted", rel,
-                                f"{rel} was deleted{where}; bring it back with kb restore {rel}, "
-                                f"or accept the deletion with kb doctor --ack {rel}"))
+                                f"{rel} was deleted{where}; bring it back with kb restore {arg}, "
+                                f"or accept the deletion with kb doctor --ack {arg}"))
     for rel, fp in new.items():
         notes[rel] = fp | {"writer": "external"}
 

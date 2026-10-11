@@ -142,3 +142,11 @@ def test_resolver(tmp_path):
 def test_is_restored_copy(tmp_path):
     assert integrity.is_restored_copy(tmp_path / "RAG.restored-20261010-120000.md")
     assert not integrity.is_restored_copy(tmp_path / "RAG.md")
+
+
+def test_hints_quote_paths_with_spaces(vault, monkeypatch, capsys):
+    new(monkeypatch, "Global Interpreter Lock")
+    (vault / "concepts" / "Global Interpreter Lock.md").unlink()
+    out = doctor(capsys)[1]
+    assert "kb restore 'concepts/Global Interpreter Lock.md'," in out
+    assert "kb doctor --ack 'concepts/Global Interpreter Lock.md'" in out
