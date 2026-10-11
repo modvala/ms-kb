@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Client Skills and Instructions v0"
-document_version: "0.3"
+document_version: "0.4"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.11"
+design_version: "1.13"
 ---
 
 # Client skills and instructions v0
@@ -92,6 +92,22 @@ Found and fixed during the check: `kb validate` took paths relative to the curre
 
 Codex and Cursor are checked in roadmap stage 5.
 
+### 4.3. Stage 4: history, off-machine copy and updates
+
+Run on the real vault `~/Knowledge/main` (Claude Code desktop Code tab, 2026-10-11). The vault had 6 notes and no repository; the remote is a private, empty GitHub repository dedicated to it, reached over HTTPS through the `gh` credential helper.
+
+| Check | Result |
+|---|---|
+| `kb init` on an existing vault | yes: repository and `.gitignore` created, one `kb: init vault` commit with all notes and templates; with no `user.email`, the author fell back to `kb <kb@localhost>` (a repository-local identity was set afterwards) |
+| `kb setup --remote … --schedule` | yes: `[kbs.main.sync]` written, `origin` set, LaunchAgent loaded; its `RunAtLoad` run pushed `main` within seconds (exit code 0) |
+| `add-knowledge` in Claude Code commits with provenance | yes: `kb: create <session>`, `kb: extend <concept>`, `kb: extend learning_profile.md`, with `Kb-Skill: add-knowledge` and `Kb-Agent: claude-code`; the profile commit had no `Kb-Skill` (fixed: the skill now passes `--skill` for the profile) |
+| An edit outside `kb` | yes: committed separately as `external: 1 file changed outside kb` and pushed by the hourly run at the top of the hour |
+| A note deleted by hand | yes: `kb doctor` reported the deletion and, separately, the three links that stopped resolving; `kb restore` brought it back and `kb doctor` was clean again |
+| Recovery from the remote | yes: `git clone` of the remote matched the vault; only empty folders (which Git does not keep, `kb init` recreates them) and `.DS_Store` differed |
+| `kb update` after a version bump | yes: 0.4.0 → 0.5.0, skills in `~/.claude/skills` and `~/.agents/skills`, the global instruction and the LaunchAgent updated; `kb doctor` shows 0.5.0 everywhere |
+
+Found and fixed during the check: `kb doctor` printed `kb restore concepts/Global Interpreter Lock.md` without quotes, so the suggested command failed in a shell; paths in hints are now shell-quoted.
+
 ## 5. Portable `SKILL.md` v0
 
 Every skill shipped by the package follows these rules, so one file works in all three clients:
@@ -117,3 +133,4 @@ metadata:
 - **0.1 — 2026-10-09:** first version, roadmap stage 0.
 - **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6); hands-on results of `add-knowledge` (§4).
 - **0.3 — 2026-10-10:** roadmap stage 3: the global instruction implemented (§2.4); the hands-on check of `kb-recall` (§4.2).
+- **0.4 — 2026-10-11:** roadmap stage 4: the hands-on check of history, `kb sync`, `kb restore` and `kb update` on the real vault (§4.3).

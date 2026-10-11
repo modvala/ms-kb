@@ -1,16 +1,16 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.8"
+document_version: "1.9"
 created: "2026-10-09"
 language: en
 status: draft
 requirements_ref: "personal-knowledge-user-stories-v1.md"
 requirements_version: "1.11"
 design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.12"
+design_version: "1.13"
 ---
 
-# Personal Knowledge System — Roadmap v1.8
+# Personal Knowledge System — Roadmap v1.9
 
 ## 1. Purpose
 
@@ -28,7 +28,7 @@ The roadmap breaks the requirements (user stories v1.7) and the design (v1.6) in
 | 1. Knowledge base | v0.2 | ✅ Done | `kb init` / `kb setup` create the vault, configuration and profile; the vault opens in Obsidian | US-01, US-16, US-19 |
 | 2. Writing: `add-knowledge` | v0.3 | ✅ Done | Conversation outcomes are saved to the knowledge base (checked in Claude Code; Codex and Cursor in stage 5), with provenance and without duplicates | US-10, US-11, US-12, US-18, US-24 |
 | 3. Reading: `kb-recall` | v0.4 | ✅ Done | The agent finds past knowledge on "let's continue", "what did we cover"; the learning profile works | US-07, US-08, US-09, US-15 |
-| 4. Updates and data protection | v0.5 | ⬜ Not done | `kb update` in a single command; the vault's own Git history with a commit per write; `kb sync` pushes to a private remote hourly and on demand; deleted notes are detected by `kb doctor` and returned by `kb restore` | US-13, US-17, US-18, US-20 |
+| 4. Updates and data protection | v0.5 | ✅ Done | `kb update` in a single command; the vault's own Git history with a commit per write; `kb sync` pushes to a private remote hourly and on demand; deleted notes are detected by `kb doctor` and returned by `kb restore` | US-13, US-17, US-18, US-20 |
 | 5. Stabilization | v1.0 | ⬜ Not done | CI on typical scenarios, provenance queries, documentation; the MVP is ready for daily use | US-12, US-13, US-23 |
 | Later | v1.x+ | — | Extensions from the backlog (§4) | US-02, US-03, US-05, US-06, US-14, US-21, US-22 |
 
@@ -112,7 +112,16 @@ Work:
 
 ### Stage 4. Updates and data protection → v0.5
 
-**Status:** ⬜ Not done. The storage research is done (2026-10-10) and recorded in design §12 v1.12: this stage implements everything Git-related; other cloud copies and multi-device sync go to the backlog (§4).
+**Status:** ✅ Done (v0.5.0, 2026-10-11). The storage research (2026-10-10) is recorded in design §12 v1.12, the implementation decisions in §12.6 v1.13. Implemented:
+
+- the vault's own Git repository with a commit per write and provenance trailers, outside edits in separate commits;
+- secrets refused, large files kept out of history;
+- `kb history`, `kb restore`, the manifest with deleted/damaged/moved and broken-link checks in `kb doctor` / `kb validate`;
+- `kb sync` to a private remote with an hourly LaunchAgent;
+- `kb update` and the version warning in `kb where`;
+- skills 0.5.0 with the vault rules.
+
+Checked hands-on on the real vault with a private GitHub remote ([clients-v0.md](clients-v0.md) §4.3). Other cloud copies and multi-device sync are in the backlog (§4).
 
 **Goal:** the package is easy to update; the knowledge base has its own change history and an off-machine copy, and accidental deletion of a note is detected and reversible.
 
@@ -202,3 +211,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.6 — 2026-10-10:** stage 4 renamed "Updates and data protection": cloud sync is no longer a committed result. Stage 4 starts with research on vault storage, split into change history (a separate Git repository for the vault), an off-machine copy (needed or not; private remote vs Google Drive) and multi-device sync (backlog). `kb sync` is implemented only if a remote copy is chosen. MVP scope, risks and backlog updated.
 - **1.7 — 2026-10-10:** stage 3 done: package `v0.4.0` with the `kb-recall` skill, the global instruction and the learning profile loaded on demand; checked hands-on in Claude Code. The "`kb` unavailable" check and the Codex/Cursor checks move to stage 5. Design reference updated to 1.11, requirements to 1.10.
 - **1.8 — 2026-10-10:** stage 4 storage research done (design §12 v1.12, user stories 1.11). Stage 4 now implements everything Git-related: the vault's own repository with a commit per write, `kb sync` pushing to a private remote hourly and on demand, `kb history`, `kb restore`, the manifest and integrity checks. Other cloud copies (Google Drive, snapshot backups) and multi-device sync moved to the backlog. MVP scope, risks and backlog updated.
+- **1.9 — 2026-10-11:** stage 4 done: package `v0.5.0` with the vault's own Git history, `kb sync` to a private remote hourly and on demand, the manifest and integrity checks, `kb history`, `kb restore` and `kb update`; checked hands-on on the real vault. Design reference updated to 1.13.
