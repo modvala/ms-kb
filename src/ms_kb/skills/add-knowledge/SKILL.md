@@ -150,7 +150,7 @@ Rules:
 The profile is the short entry point that `kb-recall` reads first. Add the session to it, and add every concept **created** in this run (not extended) to `## Known topics`:
 
 ```bash
-kb extend learning_profile.md --body-file - <<'EOF'
+kb extend learning_profile.md --skill add-knowledge --body-file - <<'EOF'
 ## Recently studied
 - <YYYY-MM-DD> — [[<session file name>]]
 ## Known topics
@@ -160,7 +160,7 @@ kb extend learning_profile.md --body-file - <<'EOF'
 EOF
 ```
 
-Leave out `## Known topics` if no concept was created. Keep each line short: the profile links to notes and does not repeat them.
+The profile gets no provenance block and needs no `--summary`; `--skill` only marks the commit. Leave out `## Known topics` if no concept was created. Keep each line short: the profile links to notes and does not repeat them.
 
 ## 9. Report
 

@@ -160,7 +160,7 @@ def extend_note(
     target = resolve_in_vault(vault, path)
     rel = target.relative_to(vault).as_posix()
     is_profile = rel == PROFILE
-    if skill and not summary:
+    if skill and not summary and not is_profile:
         raise WriteError(["--summary is required with --skill"])
     if is_profile and (topics or related or sources):
         raise WriteError([f"{PROFILE} takes only section text"])

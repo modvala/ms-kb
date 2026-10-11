@@ -857,7 +857,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path", help="note path, absolute or relative to the vault")
     p.add_argument("--body-file", metavar="FILE",
                    help="'## Section' blocks appended to those sections; - reads stdin")
-    p.add_argument("--summary", help="one line on what changed (required with --skill)")
+    p.add_argument("--summary", help="one line on what changed (required with --skill, except for learning_profile.md)")
     p.add_argument("--topic", action="append", default=[])
     p.add_argument("--related", action="append", default=[])
     p.add_argument("--source", action="append", default=[])

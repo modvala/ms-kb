@@ -126,3 +126,12 @@ def test_history_of_a_note_and_deleted_files(vault, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "D    concepts/RAG.md" in out
     assert "kb restore" in out
+
+
+def test_profile_commit_carries_skill(vault, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("## Recently studied\n- 2026-10-11 — [[x]]\n"))
+    assert main(["extend", "learning_profile.md", "--skill", "add-knowledge", "--body-file", "-"]) == 0
+    message = git(vault, "log", "-1", "--format=%B")
+    assert message.startswith("kb: extend learning_profile.md")
+    assert "Kb-Skill: add-knowledge" in message
+    assert "updates:" not in (vault / "learning_profile.md").read_text()
