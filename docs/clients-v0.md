@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Client Skills and Instructions v0"
-document_version: "0.4"
+document_version: "0.6"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
-design_ref: "personal-knowledge-design-v1.md"
-design_version: "1.13"
+design_ref: "personal-knowledge-design-v2.md"
+design_version: "2.2"
 ---
 
 # Client skills and instructions v0
@@ -74,7 +74,7 @@ Result: each of the two install directories is read by exactly one of the two cl
 | `agent` in provenance | `claude-code` (from `CLAUDECODE=1`) | pending | pending |
 | Skill sees duplicates | no | pending | pending |
 
-Codex and Cursor are checked later, together with the other skills, in roadmap stage 5.
+Codex and Cursor are checked later, together with the other skills, in roadmap stage 7.
 
 Found and fixed during the check: `kb validate` took paths relative to the current folder instead of the vault, and checked `learning_profile.md` as a note.
 
@@ -88,9 +88,9 @@ Found and fixed during the check: `kb validate` took paths relative to the curre
 | "Let's continue studying <saved topic>": `kb-recall` triggers, reads the profile and a few notes, cites conclusions and open questions with paths | yes: the request was in Russian and the skill triggered on it unprompted; 3 `kb` calls, profile + 2 sessions + 2 concepts; assumptions kept marked, its own new explanation labelled as not from the notes | pending | pending |
 | A simple question ("what is 15 × 18?") runs no `kb` command | yes | pending | pending |
 | An unsaved topic: says nothing was found, invents no history | yes (forced `/kb-recall` on an unrelated question) | pending | pending |
-| `kb` unavailable: says so and answers from the conversation only | not checked; moved to stage 5 | pending | pending |
+| `kb` unavailable: says so and answers from the conversation only | not checked; moved to stage 7 | pending | pending |
 
-Codex and Cursor are checked in roadmap stage 5.
+Codex and Cursor are checked in roadmap stage 7.
 
 ### 4.3. Stage 4: history, off-machine copy and updates
 
@@ -134,3 +134,5 @@ metadata:
 - **0.2 — 2026-10-09:** roadmap stage 2: environment variables for the `agent` provenance field (§2.6); hands-on results of `add-knowledge` (§4).
 - **0.3 — 2026-10-10:** roadmap stage 3: the global instruction implemented (§2.4); the hands-on check of `kb-recall` (§4.2).
 - **0.4 — 2026-10-11:** roadmap stage 4: the hands-on check of history, `kb sync`, `kb restore` and `kb update` on the real vault (§4.3).
+- **0.5 — 2026-10-12:** the hands-on checks in Codex and Cursor move to roadmap stage 6 (stabilization), after the new stage 5 "Topic pages" ([roadmap v2.0](personal-knowledge-roadmap-v2.md)); design reference updated to [design v2](personal-knowledge-design-v2.md).
+- **0.6 — 2026-10-19:** the hands-on checks in Codex and Cursor move to roadmap stage 7 (stabilization), after the new stage 6 "Sources for later" ([roadmap v2.2](personal-knowledge-roadmap-v2.md)).

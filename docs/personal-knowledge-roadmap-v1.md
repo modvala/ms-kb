@@ -1,16 +1,19 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "1.9"
+document_version: "1.10"
 created: "2026-10-09"
 language: en
-status: draft
+status: superseded
+superseded_by: "personal-knowledge-roadmap-v2.md"
 requirements_ref: "personal-knowledge-user-stories-v1.md"
 requirements_version: "1.11"
 design_ref: "personal-knowledge-design-v1.md"
 design_version: "1.13"
 ---
 
-# Personal Knowledge System — Roadmap v1.9
+# Personal Knowledge System — Roadmap v1.10
+
+> **Superseded** by [personal-knowledge-roadmap-v2.md](personal-knowledge-roadmap-v2.md) (2026-10-12). This version is kept as the history of the MVP decisions for roadmap stages 0–4.
 
 ## 1. Purpose
 
@@ -212,3 +215,4 @@ The order is approximate: items at the top are closer to the current value.
 - **1.7 — 2026-10-10:** stage 3 done: package `v0.4.0` with the `kb-recall` skill, the global instruction and the learning profile loaded on demand; checked hands-on in Claude Code. The "`kb` unavailable" check and the Codex/Cursor checks move to stage 5. Design reference updated to 1.11, requirements to 1.10.
 - **1.8 — 2026-10-10:** stage 4 storage research done (design §12 v1.12, user stories 1.11). Stage 4 now implements everything Git-related: the vault's own repository with a commit per write, `kb sync` pushing to a private remote hourly and on demand, `kb history`, `kb restore`, the manifest and integrity checks. Other cloud copies (Google Drive, snapshot backups) and multi-device sync moved to the backlog. MVP scope, risks and backlog updated.
 - **1.9 — 2026-10-11:** stage 4 done: package `v0.5.0` with the vault's own Git history, `kb sync` to a private remote hourly and on demand, the manifest and integrity checks, `kb history`, `kb restore` and `kb update`; checked hands-on on the real vault. Design reference updated to 1.13.
+- **1.10 — 2026-10-12:** superseded by [personal-knowledge-roadmap-v2.md](personal-knowledge-roadmap-v2.md); content unchanged.

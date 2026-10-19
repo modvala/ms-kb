@@ -1,16 +1,19 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "1.13"
+document_version: "1.14"
 created: "2026-10-05"
-updated: "2026-10-10"
+updated: "2026-10-12"
 language: en
-status: discussion_baseline
+status: superseded
+superseded_by: "personal-knowledge-design-v2.md"
 requirements_ref: "personal-knowledge-user-stories-v1.md"
 requirements_version: "1.11"
 origin: "Architecture discussion with the user and the recorded requirements"
 ---
 
-# Personal Knowledge System — Design & Contracts v1.13
+# Personal Knowledge System — Design & Contracts v1.14
+
+> **Superseded** by [personal-knowledge-design-v2.md](personal-knowledge-design-v2.md) (2026-10-12). This version is kept as the history of the MVP decisions for roadmap stages 0–4.
 
 ## 1. Purpose and status
 
@@ -754,3 +757,4 @@ A separate Qdrant/vector DB, Neo4j, mandatory Excalidraw, copies of the whole We
 - **1.11 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (§10); the global instruction is a marked block in `CLAUDE.md` / `AGENTS.md`, pasted by hand in Cursor (§9.1); MVP search is text and metadata. Updated §14.
 - **1.12 — 2026-10-10:** roadmap stage 4 research done; storage decided. The vault root is its own Git repository with a commit per `kb` write (§12.1); the off-machine copy is a push to a private remote dedicated to the vault, hourly and on demand, with Time Machine as the local copy (§12.3); the v1.2 exclusion of GitHub is revised, the vault never goes into the package repository (§12). Data integrity decided: manifest, broken-link and freshness checks, `kb restore`, agent sandbox settings (§12.4). Google Drive via `rclone`, snapshot backups and multi-device sync moved after the MVP (§12.5; the former §12.1 baseline). Updated decisions 9 and 17, §2.2, §3, §4.2, §7, §11, §11.1, §14.
 - **1.13 — 2026-10-10:** roadmap stage 4 implemented: §12.6 records the decisions left to implementation (secret patterns and override, outside files kept out of history, non-interactive Git, state files, damaged vs changed, freshness threshold, command names, version check before writing). §12.1: outside edits with secrets are never committed. §12.4: the manifest covers notes created outside `kb`; `kb doctor --ack`. Updated §14.
+- **1.14 — 2026-10-12:** superseded by [personal-knowledge-design-v2.md](personal-knowledge-design-v2.md); content unchanged.

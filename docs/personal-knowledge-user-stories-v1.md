@@ -1,14 +1,17 @@
 ---
 title: "Personal Knowledge System — User Stories"
-document_version: "1.11"
+document_version: "1.12"
 created: "2026-10-05"
-updated: "2026-10-10"
+updated: "2026-10-12"
 language: en
-status: requirements_baseline
+status: superseded
+superseded_by: "personal-knowledge-user-stories-v2.md"
 origin: "Decisions from discussions with the user, consolidated into user stories"
 ---
 
-# Personal Knowledge System — User Stories v1.11
+# Personal Knowledge System — User Stories v1.12
+
+> **Superseded** by [personal-knowledge-user-stories-v2.md](personal-knowledge-user-stories-v2.md) (2026-10-12). This version is kept as the history of the MVP decisions for roadmap stages 0–4.
 
 This document records the desired outcome and the decisions made about the personal knowledge base. It does not mean that integrations are already connected or that the system has been implemented. Acceptance criteria turn agreements into verifiable behavior; specific tools and unresolved questions are listed separately.
 
@@ -457,3 +460,4 @@ The knowledge base is convenient to read and extend both directly and through co
 - **1.9 — 2026-10-09:** roadmap stage 2: open question 6 decided (a plan before extending existing notes).
 - **1.10 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall` (US-09); open questions 3, 5 and 10 decided for the MVP (text and metadata search, the `kb-recall` skill, the global instruction per client).
 - **1.11 — 2026-10-10:** roadmap stage 4 research: the vault gets its own Git history and a push to a private remote dedicated to it, revising the v1.4 exclusion of GitHub (the package repository still never holds notes). US-20 rewritten around history, restore and the off-machine copy; two-way multi-device sync kept as the post-MVP target. Updated the storage decision, MVP decisions, US-13, scenarios, open questions 7 and 11, boundaries.
+- **1.12 — 2026-10-12:** superseded by [personal-knowledge-user-stories-v2.md](personal-knowledge-user-stories-v2.md); content unchanged.

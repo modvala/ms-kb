@@ -102,8 +102,9 @@ uv run pytest
 
 ## Documents
 
-- [Requirements (user stories)](docs/personal-knowledge-user-stories-v1.md)
-- [Design](docs/personal-knowledge-design-v1.md)
-- [Roadmap](docs/personal-knowledge-roadmap-v1.md)
+- [Requirements (user stories) v2](docs/personal-knowledge-user-stories-v2.md)
+- [Design v2](docs/personal-knowledge-design-v2.md)
+- [Roadmap v2](docs/personal-knowledge-roadmap-v2.md)
+- Superseded v1 documents, kept as the history of roadmap stages 0–4: [user stories](docs/personal-knowledge-user-stories-v1.md), [design](docs/personal-knowledge-design-v1.md), [roadmap](docs/personal-knowledge-roadmap-v1.md)
 - [Note schema, vault structure and configuration v0](docs/note-schema-v0.md)
 - [Client skills and instructions v0](docs/clients-v0.md)
