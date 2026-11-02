@@ -9,7 +9,7 @@ Case is ignored, as in Obsidian on macOS.
 import re
 from pathlib import Path
 
-from ms_kb.notes import NoteError, parse
+from ms_kb.notes import NoteError, meta_list, parse
 
 LINK = re.compile(r"!?\[\[([^\[\]\n]+?)\]\]")
 SKIP_DIRS = {".git", ".obsidian", ".trash"}
@@ -33,8 +33,9 @@ def vault_files(vault: Path) -> list[Path]:
 def self_names(rel: str, meta) -> set[str]:
     """The link targets that point to the note at `rel`: path, file name, title and aliases."""
     stem = rel.removesuffix(".md").lower()
-    names = {stem, stem.rsplit("/", 1)[-1]}
-    names |= {str(a).lower() for a in (meta.get("aliases") or []) if a}
+    names = {stem, stem.rsplit("/", 1)[-1], str(meta.get("title", "")).lower()}
+    names |= {a.lower() for a in meta_list(meta, "aliases")}
+    names.discard("")
     return names
 
 
@@ -48,12 +49,11 @@ class Resolver:
             if path.suffix == ".md":
                 rel = rel[:-3]
                 try:
-                    aliases = parse(path.read_text(encoding="utf-8")).meta.get("aliases") or []
+                    aliases = meta_list(parse(path.read_text(encoding="utf-8")).meta, "aliases")
                 except (NoteError, UnicodeDecodeError, OSError):
                     aliases = []
                 for a in aliases:
-                    if a:
-                        self.aliases.setdefault(str(a).lower(), path)
+                    self.aliases.setdefault(a.lower(), path)
             rel = rel.lower()
             self.paths[rel] = path
             self.names.setdefault(rel.rsplit("/", 1)[-1], path)

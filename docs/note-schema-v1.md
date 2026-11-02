@@ -54,7 +54,7 @@ Rules for both:
 
 `created_by` is stamped by the CLI at creation with `--skill` and never changes: `skill`, `skill_version`, `package_version`, `skill_ref` (`SKILL.md` at the release tag), `date`, and `agent` when detected. Hand-written notes have none.
 
-Every write is a commit with the trailers `Kb-Skill`, `Kb-Skill-Version`, `Kb-Version`, `Kb-Agent` (when known) and `Kb-Reason` (when given). `kb` writes no `updates` entries; existing ones on v1 notes stay and are still validated. Query them with `kb history --skill S --version V --reason TEXT`.
+Every write is a commit with the trailers `Kb-Skill`, `Kb-Skill-Version`, `Kb-Version`, `Kb-Agent` (when known) and `Kb-Reason`: required for `kb rewrite`, and for `kb extend` with `--skill`; from `--reason` on `kb new`; made from `--why` by `kb link`; fixed for `kb my-words`. `kb` writes no `updates` entries; existing ones on v1 notes stay and are still validated. Query them with `kb history --skill S --version V --reason TEXT`.
 
 ## 4. File names and vault structure
 
@@ -74,14 +74,14 @@ Notes are written only by the CLI (design §9.1).
 
 | Command | Works on | Refuses |
 |---|---|---|
-| `kb new topic` | new page | a duplicate (below); text in `## In my words`; `--topic`, `--related`, `--source`, `--url` |
-| `kb new source` | new card | a duplicate (below); not exactly one of `url` and `ref`; `--topic`, `--related`, `--source` |
+| `kb new topic` | new page | no `--body-file`; a duplicate (below); text in `## In my words`; `--topic`, `--related`, `--source`, `--url` |
+| `kb new source` | new card | no `--body-file`; a duplicate (below); not exactly one of `url` and `ref`; `--topic`, `--related`, `--source` |
 | `kb rewrite` | topic page, profile | anything else; a draft with frontmatter; a draft changing `## In my words`; without `--approve` the matching hash; a body under half of the current one without `--allow-shrink` |
 | `kb link` | any note but the profile | a target that does not resolve; a link to itself |
 | `kb extend` | any note | on pages: `--topic`, `--related`, `--source` and a `## In my words` block; with `--skill`: no `--reason`, except for the profile |
-| `kb my-words` | topic page | an empty text; a `#` or `##` heading in the text |
+| `kb my-words` | topic page | an empty text; a `#` or `##` heading or an open code fence in the text |
 
-A missing section is created in its fixed place.
+A missing section is created in its fixed place. Links that do not resolve are refused by `kb link` and reported by the dry-runs of `kb new` and `kb rewrite`: a draft may name a page to create next.
 
 **Duplicates.** Refused: the same file name in any folder; the same title or alias within the type (ignoring case, spaces and punctuation); for a card, the same normalized URL (lowercase scheme and host, no fragment, no trailing slash, no `utm_*` parameters). A title or alias with similarity ≥ 0.85 within the type is refused unless `--allow-similar`.
 

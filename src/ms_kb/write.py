@@ -22,7 +22,6 @@ from ms_kb.notes import (
     TOPIC_SECTIONS,
     Note,
     append_to_section,
-    has_heading,
     merge_list,
     note_rel_path,
     parse,
@@ -31,6 +30,7 @@ from ms_kb.notes import (
     render,
     replace_section,
     section_text,
+    splits_section,
     wikilink,
 )
 from ms_kb.provenance import skill_warnings, stamp
@@ -102,6 +102,7 @@ def new_note(
     session_date: str | None = None,
     skill: str | None = None,
     allow_similar: bool = False,
+    reason: str | None = None,
     summary: str | None = None,
     tags: list[str] = (),
     created: str | None = None,
@@ -125,10 +126,9 @@ def new_note(
     rel = note_rel_path(note_type, title, slug, session_date)
 
     exact, similar = find_duplicates(vault, note_type, title, list(aliases), rel, url)
-    update = {"topic": "update it with kb rewrite", "source": "add to it with kb extend"}.get(
-        note_type, "add to it with kb extend")
     if exact:
-        raise WriteError([f"already exists: {', '.join(exact)}; {update}"])
+        how = "update it with kb rewrite" if note_type == "topic" else "add to it with kb extend"
+        raise WriteError([f"already exists: {', '.join(exact)}; {how}"])
     if similar and not allow_similar:
         raise WriteError(
             [
@@ -166,6 +166,8 @@ def new_note(
     if skill:
         meta["created_by"], warnings = stamp(skill, day)
 
+    if body is None and is_new_page:
+        raise WriteError(["--body-file is required: a page needs at least ## Summary"])
     if body is None:
         text_body = _template_body(note_type, title, day)
     else:
@@ -183,7 +185,8 @@ def new_note(
     report = validate(note, rel)
     if report.errors:
         raise WriteError(report.errors)
-    return Result(vault / rel, rel.as_posix(), "created", render(note), warnings=warnings + report.warnings)
+    return Result(vault / rel, rel.as_posix(), "created", render(note), warnings=warnings + report.warnings,
+                  reason=one_line(reason))
 
 
 def resolve_in_vault(vault: Path, path: str) -> Path:
@@ -215,7 +218,7 @@ def extend_note(
     target = resolve_in_vault(vault, path)
     rel = target.relative_to(vault).as_posix()
     is_profile = rel == PROFILE
-    if skill and not reason and not is_profile:
+    if skill and not one_line(reason) and not is_profile:
         raise WriteError(["--reason is required with --skill"])
     if is_profile and (topics or related or sources):
         raise WriteError([f"{PROFILE} takes only section text"])
@@ -359,7 +362,7 @@ def link_note(vault: Path, src: str, target: str, why: str, skill: str | None = 
     if report.errors:
         raise WriteError([f"{rel}: {e}" for e in report.errors])
     return Result(path, rel, "linked", render(note), original, ["Related"],
-                  warnings=skill_warnings(skill) + report.warnings)
+                  warnings=skill_warnings(skill) + report.warnings, reason=f"Link to {name}: {why}")
 
 
 def my_words_note(vault: Path, path: str, text: str, skill: str | None = None) -> Result:
@@ -374,8 +377,9 @@ def my_words_note(vault: Path, path: str, text: str, skill: str | None = None) -
     text = text.rstrip("\n")
     if not text.strip():
         raise WriteError(["the text is empty; to clear the section, edit it in Obsidian"])
-    if has_heading(text):
-        raise WriteError(["the text contains a '#' or '##' heading, which would split the section"])
+    if splits_section(text):
+        raise WriteError(["the text contains a '#' or '##' heading or an open code fence, "
+                          "which would split the section"])
     new_body = replace_section(note.body, MY_WORDS, text, TOPIC_SECTIONS)
     if new_body == note.body:
         return Result(target, rel, "unchanged", original, original)
@@ -385,7 +389,7 @@ def my_words_note(vault: Path, path: str, text: str, skill: str | None = None) -
     if report.errors:
         raise WriteError([f"{rel}: {e}" for e in report.errors])
     return Result(target, rel, "my-words", render(note), original, [MY_WORDS],
-                  warnings=skill_warnings(skill) + report.warnings)
+                  warnings=skill_warnings(skill) + report.warnings, reason="The user's own words")
 
 
 def save(result: Result) -> None:

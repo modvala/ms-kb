@@ -9,6 +9,8 @@ the last Git commit, push and error.
 import fcntl
 import hashlib
 import json
+import re
+import shutil
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -69,30 +71,38 @@ def lock(name: str):
 
 
 DRAFT_DAYS = 7
+DRAFT_KEY = re.compile(r"[0-9a-f]{12}")
 
 
 def _drafts(name: str) -> Path:
     return config_path().parent / f"drafts-{name}"
 
 
-def save_draft(name: str, key: str, text: str) -> None:
+def _page_drafts(name: str, rel: str) -> Path:
+    return _drafts(name) / hashlib.sha256(rel.encode("utf-8")).hexdigest()[:12]
+
+
+def save_draft(name: str, rel: str, key: str, text: str) -> None:
     """Keep a reviewed draft outside the vault for `--since`; old ones are pruned (design §12.6)."""
-    folder = _drafts(name)
-    folder.mkdir(parents=True, exist_ok=True)
     limit = time.time() - DRAFT_DAYS * 86400
-    for old in folder.glob("*.md"):
+    for old in _drafts(name).glob("*/*.md"):
         if old.stat().st_mtime < limit:
             old.unlink(missing_ok=True)
+    folder = _page_drafts(name, rel)
+    folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{key}.md").write_text(text, encoding="utf-8")
 
 
-def read_draft(name: str, key: str) -> str | None:
-    path = _drafts(name) / f"{key}.md"
+def read_draft(name: str, rel: str, key: str) -> str | None:
+    if not DRAFT_KEY.fullmatch(key):
+        return None
+    path = _page_drafts(name, rel) / f"{key}.md"
     return path.read_text(encoding="utf-8") if path.is_file() else None
 
 
-def drop_draft(name: str, key: str) -> None:
-    (_drafts(name) / f"{key}.md").unlink(missing_ok=True)
+def drop_drafts(name: str, rel: str) -> None:
+    """A written page needs none of its drafts any more."""
+    shutil.rmtree(_page_drafts(name, rel), ignore_errors=True)
 
 
 def now() -> str:

@@ -453,3 +453,106 @@ def test_topics_are_tracked_by_integrity(page, vault, capsys):
     capsys.readouterr()
     assert main(["doctor"]) == 1
     assert "topics/Concurrency.md was deleted" in capsys.readouterr().out
+
+
+# --- found in review ------------------------------------------------------------
+
+
+def test_rewrite_keeps_own_section_behind_my_words(vault, kb, capsys):
+    """Design §6.2: own sections are allowed after ## In my words; a draft may leave that section out."""
+    assert kb("new", "topic", "--title", "Own", "--summary", "s", "--tag", "x", "--body-file", "-",
+              stdin="## Summary\nA longer summary line.\n\n## In my words\n\n## Code\nprint(1)\n") == 0
+    body = "## Summary\nA longer summary line, reworded.\n\n## Code\nprint(1)\n"
+    out, key = dry_run(kb, capsys, body, path="topics/Own.md")
+    assert approve(kb, key, body, path="topics/Own.md") == 0
+    text = (vault / "topics" / "Own.md").read_text()
+    assert text.index("## Summary") < text.index("## In my words") < text.index("## Code")
+
+
+def test_fixed_section_goes_after_the_one_before_it(vault, kb):
+    assert kb("new", "topic", "--title", "Own", "--summary", "s", "--tag", "x", "--body-file", "-",
+              stdin="## Summary\nS.\n\n## Code\nx\n\n## Sources\n- a\n") == 0
+    assert kb("link", "topics/Own.md", "Own2", "--why", "x") == 1
+    assert kb("extend", "topics/Own.md", "--body-file", "-", stdin="## Key ideas\n- k\n") == 0
+    text = (vault / "topics" / "Own.md").read_text()
+    assert text.index("## In my words") < text.index("## Key ideas") < text.index("## Code") < text.index("## Sources")
+    assert main(["validate", "topics/Own.md"]) == 0
+
+
+def test_my_words_refuses_an_open_fence(page, kb):
+    assert kb("my-words", "topics/Concurrency.md", "--body-file", "-", stdin="one\n```\n## x\n") == 1
+    assert kb("my-words", "topics/Concurrency.md", "--body-file", "-", stdin="one\n```\ncode\n```\n") == 0
+
+
+def test_page_never_committed_counts_as_hand_written(vault, kb, capsys):
+    path = vault / "topics" / "Mine.md"
+    path.write_text('---\ntype: topic\ntitle: "Mine"\nsummary: "s"\ntags: [x]\ncreated: "2026-01-01"\n'
+                    'updated: "2026-01-01"\n---\n\n# Mine\n\n## Summary\nWritten in Obsidian, a long enough line.\n')
+    out, _ = dry_run(kb, capsys, "## Summary\nReplaced by the agent, a long enough line.\n", path="topics/Mine.md")
+    assert "not committed yet: Written in Obsidian" in out
+
+
+def test_hand_edited_summary_flagged(page, kb, vault, capsys):
+    page.write_text(page.read_text().replace('summary: "How to choose"', 'summary: "My own line"'))
+    capsys.readouterr()
+    assert kb("rewrite", "topics/Concurrency.md", "--reason", "r", "--summary", "Agent line", "--body-file", "-",
+              "--dry-run", stdin=NEW_BODY) == 0
+    assert 'not committed yet: summary: "My own line"' in capsys.readouterr().out
+
+
+def test_hand_edited_scalar_fields_do_not_crash(page, vault, kb, capsys):
+    other = vault / "topics" / "Other.md"
+    other.write_text(other.read_text().replace("- misc", "").replace("tags:\n", "tags: 2024\naliases: 7\n"))
+    dry_run(kb, capsys)
+    assert kb("index") == 0
+
+
+def test_hidden_text_keeps_other_languages_readable(page, kb, capsys):
+    out, _ = dry_run(kb, capsys, NEW_BODY + "\nСкрытый​текст\n")
+    assert "Скрытый\\u200bтекст" in out
+
+
+def test_index_tree_sorts_nested_under_parent(vault, kb, capsys):
+    for title, tag in (("A", "python-web"), ("B", "python/asyncio")):
+        assert kb("new", "topic", "--title", title, "--summary", "s", "--tag", tag, "--body-file", "-",
+                  stdin="## Summary\nS.\n") == 0
+    capsys.readouterr()
+    assert kb("index") == 0
+    out = capsys.readouterr().out
+    assert out.index("python\n") < out.index("python/asyncio") < out.index("python-web")
+
+
+def test_new_page_needs_a_body(vault, kb, capsys):
+    assert kb("new", "topic", "--title", "T", "--summary", "s", "--tag", "a") == 1
+    assert "--body-file is required" in capsys.readouterr().err
+
+
+def test_blank_reasons_refused(page, kb, capsys):
+    assert kb("extend", "topics/Other.md", "--skill", "add-knowledge", "--reason", "   ", "--body-file", "-",
+              stdin="## Open questions\n- q\n") == 1
+    assert kb("rewrite", "topics/Concurrency.md", "--reason", " ", "--body-file", "-", "--dry-run", stdin=NEW_BODY) == 1
+
+
+def test_every_write_records_a_reason(page, vault, kb):
+    assert "Kb-Reason" not in git(vault, "log", "-1", "--format=%B")  # kb new without --reason
+    assert kb("link", "topics/Other.md", "Concurrency", "--why", "shares a tag") == 0
+    assert "Kb-Reason: Link to Concurrency: shares a tag" in git(vault, "log", "-1", "--format=%B")
+    assert kb("my-words", "topics/Other.md", "--body-file", "-", stdin="Моими словами.\n") == 0
+    assert "Kb-Reason: The user's own words" in git(vault, "log", "-1", "--format=%B")
+    assert kb("new", "topic", "--title", "Third", "--summary", "s", "--tag", "x", "--reason", "A new topic",
+              "--body-file", "-", stdin="## Summary\nS.\n") == 0
+    assert "Kb-Reason: A new topic" in git(vault, "log", "-1", "--format=%B")
+
+
+def test_drafts_removed_after_the_write_and_since_cannot_escape(page, kb, capsys, isolated_config, tmp_path):
+    _, first = dry_run(kb, capsys)
+    out, key = dry_run(kb, capsys, NEW_BODY + "\nMore.\n")
+    drafts = isolated_config.parent / "drafts-main"
+    assert len(list(drafts.glob("*/*.md"))) == 2
+    secret = tmp_path / "outside.md"
+    secret.write_text("outside text")
+    out, _ = dry_run(kb, capsys, NEW_BODY, "--since", "../../../outside")
+    assert "outside text" not in out and "no longer kept" in out
+    _, key = dry_run(kb, capsys)
+    assert approve(kb, key) == 0
+    assert not list(drafts.glob("*/*.md"))

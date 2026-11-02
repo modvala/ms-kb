@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ms_kb.links import LINK, Resolver, normalize
-from ms_kb.notes import _is_bullet, section_text
+from ms_kb.notes import is_bullet, meta_list, section_text
+from ms_kb.schema import is_page
 from ms_kb.search import iter_notes, tag_matches
 
 NO_TAG = "(no tag)"
@@ -37,14 +38,9 @@ class Entry:
         return f"[[{self.title}]] — {self.summary} ({n} open question{'s' if n != 1 else ''})"
 
 
-def _tags(meta) -> list[str]:
-    tags = meta.get("tags")
-    return [str(t) for t in tags] if isinstance(tags, list) else []
-
-
 def _open_questions(body: str) -> int:
     lines = [l for l in (section_text(body, "Open questions") or "").splitlines() if l.strip()]
-    top = [l for l in lines if _is_bullet(l) and not l.startswith((" ", "\t"))]
+    top = [l for l in lines if is_bullet(l) and not l.startswith((" ", "\t"))]
     return len(top) or (1 if lines else 0)
 
 
@@ -67,9 +63,9 @@ def entries(vault: Path, kind: str, tag: str | None = None) -> list[Entry]:
     result = []
     for path, note in iter_notes(vault):
         meta = note.meta
-        if meta.get("type") != kind:
+        if meta.get("type") != kind or not is_page(meta):
             continue
-        tags = _tags(meta)
+        tags = meta_list(meta, "tags")
         if tag and not any(tag_matches(tag, t) for t in tags):
             continue
         result.append(Entry(path, str(meta.get("title", path.stem)), str(meta.get("summary", "")), tags,
@@ -88,7 +84,7 @@ def render(items: list[Entry], tag: str | None = None) -> list[str]:
         if "/" in t:
             groups.setdefault(t.split("/", 1)[0], [])
     lines = []
-    for t in sorted(groups, key=lambda name: (name == NO_TAG, name)):
+    for t in sorted(groups, key=lambda name: (name == NO_TAG, name.split("/"))):
         indent = "  " if "/" in t else ""
         lines.append(f"{indent}{t}")
         lines += [f"{indent}  {entry.line()}" for entry in groups[t]]
@@ -99,6 +95,6 @@ def tag_counts(vault: Path) -> dict[str, int]:
     """The vocabulary: tags in use on topic pages and source cards, with counts (design §5.3)."""
     counts: dict[str, int] = {}
     for _, note in iter_notes(vault):
-        for t in _tags(note.meta):
+        for t in meta_list(note.meta, "tags"):
             counts[t] = counts.get(t, 0) + 1
     return dict(sorted(counts.items()))

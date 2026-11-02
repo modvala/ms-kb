@@ -29,7 +29,7 @@ from ms_kb.history import GitError
 from ms_kb.provenance import REPO_URL, trailers
 from ms_kb.secretscan import find_hidden, find_secrets
 from ms_kb.vault import check_vault, has_notes, init_vault
-from ms_kb.write import WriteError, extend_note, link_note, my_words_note, new_note, rewrite_note, save
+from ms_kb.write import PAGE_TYPES, WriteError, extend_note, link_note, my_words_note, new_note, rewrite_note, save
 
 DEFAULT_KB = "main"
 DEFAULT_VAULT = "~/Knowledge/main"
@@ -640,6 +640,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         session_date=args.session_date,
         skill=args.skill,
         allow_similar=args.allow_similar,
+        reason=args.reason,
         summary=args.summary,
         tags=args.tag,
         created=args.created,
@@ -648,7 +649,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         published=args.published,
     )
     code = _finish(result, args.dry_run, args.skill, args.allow_secret_like)
-    if args.dry_run and args.type in ("topic", "source"):
+    if args.dry_run and args.type in PAGE_TYPES:
         print()
         print("\n".join(pagecheck.check(vault, result.rel, result.text)))
     return code
@@ -695,8 +696,8 @@ def cmd_rewrite(args: argparse.Namespace) -> int:
         for w in result.warnings:
             _warn(w)
         print(rewrite_report.build(vault, result, key, args.sections, args.allow_shrink,
-                                   args.since, vaultstate.read_draft(name, args.since) if args.since else None))
-        vaultstate.save_draft(name, key, result.text)
+                                   args.since, vaultstate.read_draft(name, result.rel, args.since) if args.since else None))
+        vaultstate.save_draft(name, result.rel, key, result.text)
         return 0
     if args.approve != key:
         return _error("the page or the draft changed after review; run --dry-run again and show the new report")
@@ -704,7 +705,7 @@ def cmd_rewrite(args: argparse.Namespace) -> int:
         return _error(f"the body would shrink to {ratio:.0%} of its size; "
                       "only the user can allow this, with --allow-shrink")
     code = _finish(result, False, args.skill, args.allow_secret_like)
-    vaultstate.drop_draft(name, key)
+    vaultstate.drop_drafts(name, result.rel)
     return code
 
 
@@ -934,6 +935,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("type", choices=NOTE_TYPES)
     p.add_argument("--title", required=True)
     p.add_argument("--summary", help="one line for the index (topic, source)")
+    p.add_argument("--reason", help="one line on why the page is created; goes to the commit")
     p.add_argument("--tag", action="append", default=[], help="1-3 tags, e.g. python/concurrency (topic, source)")
     p.add_argument("--created", help="YYYY-MM-DD, for migrated pages (default today)")
     p.add_argument("--ref", help="author, title, edition or a local path, for a source without a URL (source)")
@@ -947,7 +949,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--url", help="URL of the source (source)")
     p.add_argument("--as-of", help="YYYY-MM-DD the comparison applies to (research; default today)")
     p.add_argument("--session-date", help="YYYY-MM-DD (learning-session; default today)")
-    p.add_argument("--body-file", metavar="FILE", help="Markdown body; - reads stdin (default: the type template)")
+    p.add_argument("--body-file", metavar="FILE", help="Markdown body; - reads stdin (required for topic and source; otherwise default: the type template)")
     p.add_argument("--skill", help="stamp provenance for this skill, e.g. add-knowledge")
     p.add_argument("--allow-similar", action="store_true", help="create even if notes with similar titles exist")
     p.add_argument("--allow-secret-like", action="store_true",

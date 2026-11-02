@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ms_kb.catalogue import tag_counts
 from ms_kb.links import LINK, Resolver, normalize, self_names, targets
-from ms_kb.notes import MY_WORDS, parse
+from ms_kb.notes import MY_WORDS, meta_list, parse
 from ms_kb.schema import PAGE_BUDGET
 from ms_kb.search import iter_notes
 
@@ -69,8 +69,7 @@ def check(vault: Path, rel: str, text: str, old_body: str | None = None) -> list
     """Report lines for the page at `rel` with the content `text`."""
     note = parse(text)
     meta = note.meta
-    me = self_names(rel, meta) | {str(meta.get("title", "")).lower()}
-    me.discard("")
+    me = self_names(rel, meta)
     linked = targets(note.body)
     resolver = Resolver(vault)
     self_path = (vault / rel).resolve()
@@ -81,9 +80,7 @@ def check(vault: Path, rel: str, text: str, old_body: str | None = None) -> list
             continue
         other_rel = path.relative_to(vault).as_posix()
         title = str(other.meta.get("title", path.stem))
-        aliases = [str(a) for a in (other.meta.get("aliases") or []) if a]
-        keys = self_names(other_rel, other.meta) | {title.lower()}
-        others.append((title, aliases, keys))
+        others.append((title, meta_list(other.meta, "aliases"), self_names(other_rel, other.meta)))
         by_path[path.resolve()] = (title, other, other_rel)
 
     lines = []
@@ -111,17 +108,14 @@ def check(vault: Path, rel: str, text: str, old_body: str | None = None) -> list
         if broken:
             lines.append(f"  links from other pages to headings this removes: {', '.join(sorted(broken))}")
 
-    tags = [str(t) for t in (meta.get("tags") or [])]
+    tags = meta_list(meta, "tags")
     shared = sorted(by_path[p][0] for p in by_path if p not in linked_paths
-                    and set(tags) & {str(t) for t in (by_path[p][1].meta.get("tags") or [])})
+                    and set(tags) & set(meta_list(by_path[p][1].meta, "tags")))
     if shared:
         lines.append(f"  pages sharing a tag, not linked: {', '.join(shared[:MAX_SHARED_TAG])}")
 
-    known = tag_counts(vault)
-    written = vault / rel
-    current = {str(t) for t in (parse(written.read_text(encoding="utf-8")).meta.get("tags") or [])} \
-        if written.is_file() else set()
-    new_tags = [t for t in tags if t not in known and t not in current]
+    known = tag_counts(vault)  # the page on disk counts, so its current tags are not new
+    new_tags = [t for t in tags if t not in known]
     if new_tags:
         lines.append(f"  new tags, to confirm: {', '.join(new_tags)}")
 

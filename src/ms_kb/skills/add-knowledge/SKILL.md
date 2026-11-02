@@ -71,7 +71,7 @@ For a new page:
 
 ```bash
 kb new topic --title "<Title>" --summary "<line>" --tag <tag> --alias "<name>" \
-  --body-file <draft> --skill add-knowledge --dry-run
+  --reason "<why it is new>" --body-file <draft> --skill add-knowledge --dry-run
 ```
 
 `kb rewrite` also takes `--summary`, `--tag` and `--alias`; each replaces the current value and belongs in every later call of the same rewrite.
@@ -88,7 +88,7 @@ The check is local: the written page and the pages it links to. A neighbour rece
 
 One message, in separately approved parts:
 
-1. **The page:** the final report (sections, diff, what disappears, hand-edited lines, hidden text) or, for a new page, the page and its closest existing pages.
+1. **The page:** the final report (sections, diff, what disappears, hand-edited lines, hidden text) with the removed and replaced claims and the reason for each or, for a new page, the page and its closest existing pages.
 2. **Lines for linked pages**, word for word.
 3. **Findings** with the proposed action for each.
 4. **New tags**, and `--allow-similar` if `kb` refused a similar title.

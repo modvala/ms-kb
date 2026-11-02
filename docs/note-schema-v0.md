@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Note Schema, Vault Structure and Configuration v0"
-document_version: "0.5"
+document_version: "0.6"
 created: "2026-10-09"
 language: en
 status: superseded
@@ -201,3 +201,4 @@ Warnings:
 - **0.3 — 2026-10-10:** roadmap stage 3: the learning profile is loaded on demand by `kb-recall`, `## Known topics` is filled by `add-knowledge`, `kb doctor` warns above 150 lines (§5).
 - **0.4 — 2026-10-10:** the planned `[kbs.<name>.sync]` section uses `provider = "git"` with a remote of the vault's own repository instead of `rclone` (design §12.3).
 - **0.5 — 2026-10-10:** roadmap stage 4: `.gitignore` and `.git/` in the vault (§4); `[kbs.<name>.sync]` is live, and `vault-<kb>.json`, the lock and `[schedule]` are documented as state (§6); commits and the secret check on writes (§7).
+- **0.6 — 2026-11-02:** superseded by note-schema-v1.md; kept as the reference for the v1 note types and the configuration.

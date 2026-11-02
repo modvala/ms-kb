@@ -250,7 +250,11 @@ def log(vault: Path, path: str | None = None, deleted: bool = False, limit: int 
 
 def hand_edited(vault: Path, rel: str) -> dict[str, str]:
     """Line -> date for lines last changed outside kb, or not committed yet (design §12.6)."""
-    out = check(run(vault, "blame", "--porcelain", "--", rel)).stdout
+    blame = run(vault, "blame", "--porcelain", "--", rel)
+    if blame.returncode != 0 and run(vault, "ls-files", "--error-unmatch", "--", rel).returncode != 0:
+        # Never committed: every line was written outside kb.
+        return dict.fromkeys((vault / rel).read_text(encoding="utf-8").splitlines(), "not committed yet")
+    out = check(blame).stdout
     commits: dict[str, dict[str, str]] = {}
     result, current = {}, None
     for line in out.splitlines():

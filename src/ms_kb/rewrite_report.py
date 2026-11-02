@@ -88,9 +88,9 @@ def _hand_edited(vault: Path, result) -> list[str]:
         edited = history.hand_edited(vault, result.rel)
     except GitError as e:
         return [f"hand-edited lines: unknown ({e})"]
-    kept = set(parse(result.text).body.splitlines())
-    body = parse(result.original).body.splitlines()
-    changing = [(edited[l], l) for l in body if l.strip() and l in edited and l not in kept]
+    kept = set(result.text.splitlines())
+    changing = [(edited[l], l) for l in result.original.splitlines()
+                if l.strip() and l in edited and l not in kept and not l.startswith("updated:")]
     if not changing:
         return ["hand-edited lines that change: none"]
     return ["hand-edited lines that change:", *(f"  {when}: {line}" for when, line in changing)]

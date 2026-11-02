@@ -36,7 +36,7 @@ Read `<vault>/learning_profile.md` when the request needs directions or preferen
 | "Which topics do I have in ML?" | `kb index --tag ml` |
 | "Which sources did I save on RAG?" | `kb index --sources --tag ml/rag`, `kb search "RAG" --type source` |
 
-Also find source cards on the topic: `kb search "<x>" --type source`. "Nothing found" is said only after both the index and search came back empty. Then continue from scratch, with no invented history. Older notes (`concepts/`, `learning-sessions/`) come up in search too; treat their assumptions as assumptions.
+Also find source cards on the topic: `kb search "<x>" --type source`, `kb index --sources --tag <tag>`. "Nothing found" is said only after both the index and search came back empty. Then continue from scratch, with no invented history. Older notes (`concepts/`, `learning-sessions/`) come up in search too; treat their assumptions as assumptions.
 
 ## 3. Read
 
@@ -54,7 +54,7 @@ When the user asks to be tested on X:
 
 1. Find the page of X and keep it hidden.
 2. Ask what they remember about X.
-3. Compare with `## Key ideas` and `## Details`: what matched, what is missing, what is wrong. **The page is the reference.** If your own knowledge disagrees with the page, say so as a finding and suggest a `Verify:` item through `add-knowledge`.
+3. Compare with `## Key ideas` and `## Details`: what matched, what is missing, what is wrong. **The page is the reference.** Measure the user's answer against the page alone. If your own knowledge disagrees with the page, say so as a separate finding and suggest a `Verify:` item through `add-knowledge`.
 4. Ask 2–4 "why / what if / when not" questions from the key ideas and open questions, one at a time, a hint before the answer. If the user names an angle, the questions follow it.
 5. Ask 1–2 questions mixing X with a page from its `## Related`.
 6. List the gaps in the conversation. Recording them is `add-knowledge`.

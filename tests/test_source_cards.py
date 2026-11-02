@@ -142,3 +142,18 @@ def test_v1_source_notes_stay_valid(vault):
     path.write_text('---\ntype: source\ntitle: "Old"\nurl: "https://a.example"\ncreated: "2026-01-01"\n'
                     'updated: "2026-01-01"\ntopics: [x]\n---\n\n# Old\n\n## Key takeaways\n- a\n')
     assert main(["validate", "sources/Old.md"]) == 0
+
+
+def test_malformed_url_does_not_break_later_cards(vault, kb):
+    assert new_card(kb, "Odd", "--url", "http://[x") == 0
+    assert new_card(kb, "Next", "--url", "https://example.com/n") == 0
+    assert new_card(kb, "Again", "--url", "HTTP://[X") == 1
+
+
+def test_index_sources_leaves_out_v1_notes(vault, kb, capsys):
+    (vault / "sources" / "Old.md").write_text(
+        '---\ntype: source\ntitle: "Old"\nurl: "https://a.example"\ncreated: "2026-01-01"\n'
+        'updated: "2026-01-01"\ntopics: [x]\n---\n\n# Old\n')
+    capsys.readouterr()
+    assert kb("index", "--sources") == 0
+    assert "Old" not in capsys.readouterr().out

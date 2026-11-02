@@ -171,7 +171,10 @@ def norm(text: str) -> str:
 
 def norm_url(url: str) -> str:
     """Lowercase scheme and host, no fragment, trailing slash or `utm_*` parameters (design §6.9)."""
-    parts = urlsplit(url.strip())
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:  # malformed, say an unclosed IPv6 bracket: compare it as text
+        return url.strip().lower()
     query = urlencode([(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
                        if not k.lower().startswith("utm_")])
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), query, ""))

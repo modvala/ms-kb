@@ -73,6 +73,14 @@ def render(note: Note) -> str:
     return f"---\n{buf.getvalue()}---\n{note.body}"
 
 
+def meta_list(meta, key: str) -> list[str]:
+    """A frontmatter list as strings; a hand-edited scalar counts as one item."""
+    value = meta.get(key)
+    if value is None:
+        return []
+    return [str(v) for v in value if v is not None] if isinstance(value, list) else [str(value)]
+
+
 def read_note(path: Path) -> Note:
     return parse(path.read_text(encoding="utf-8"))
 
@@ -171,15 +179,25 @@ def _section_span(lines: list[str], name: str) -> tuple[int, int] | None:
     return None
 
 
-def _is_bullet(line: str) -> bool:
+def is_bullet(line: str) -> bool:
     return bool(_BULLET.match(line))
 
 
 def _insert_at(lines: list[str], name: str, order: tuple[str, ...]) -> int:
-    """Where a missing `## name` section goes: before the next fixed section, else before Related."""
-    later = order[order.index(name) + 1 :] if name in order else ()
-    if not order and name.casefold() != "related":
-        later = ("Related",)
+    """Where a missing `## name` section goes.
+
+    Right after the fixed section before it, so the user's own sections stay
+    behind `## In my words`; else before the next fixed section. v1 notes have
+    no order: before Related.
+    """
+    if name in order:
+        at = order.index(name)
+        for section in reversed(order[:at]):
+            if span := _section_span(lines, section):
+                return span[1]
+        later = order[at + 1 :]
+    else:
+        later = ("Related",) if name.casefold() != "related" else ()
     spans = [span[0] for section in later if (span := _section_span(lines, section))]
     return min(spans) if spans else len(lines)
 
@@ -198,7 +216,7 @@ def append_to_section(body: str, name: str, text: str, order: tuple[str, ...] = 
 
     new, skipped = [], []
     for line in text.strip("\n").splitlines():
-        if _is_bullet(line) and line.strip() in existing:
+        if is_bullet(line) and line.strip() in existing:
             skipped.append(line.strip())
         else:
             new.append(line.rstrip())
@@ -220,7 +238,7 @@ def append_to_section(body: str, name: str, text: str, order: tuple[str, ...] = 
         while content and not content[-1].strip():
             content.pop()
         last = next((l for l in reversed(content) if l.strip()), None)
-        gap = [] if last and _is_bullet(last) and _is_bullet(new[0]) else [""]
+        gap = [] if last and is_bullet(last) and is_bullet(new[0]) else [""]
         if not content:
             gap = [""]
         tail = [""] if end < len(lines) else []
@@ -251,9 +269,15 @@ def replace_section(body: str, name: str, text: str, order: tuple[str, ...] = ()
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def has_heading(text: str) -> bool:
-    """A `#` or `##` heading outside code fences, which would split a section."""
-    return bool(_headings(text.splitlines()))
+def splits_section(text: str) -> bool:
+    """A `#` or `##` heading, or a code fence left open, which would swallow the headings after it."""
+    fence = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("```", "~~~")):
+            marker = stripped[:3]
+            fence = None if fence == marker else (fence or marker)
+    return fence is not None or bool(_headings(text.splitlines()))
 
 
 def split_sections(body: str) -> dict[str, str]:

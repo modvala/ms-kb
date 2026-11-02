@@ -62,7 +62,8 @@ The card and, as a separately approved part, at most one `## Sources` line for a
 
 ```bash
 kb new source --title "<Source>" --summary "<what it is and why keep it>" --url "<url>" \
-  --author "<as given>" --published <YYYY-MM-DD> --tag <tag> --skill save-source --body-file - <<'EOF_CARD'
+  --author "<as given>" --published <YYYY-MM-DD> --tag <tag> --reason "<why keep it>" \
+  --skill save-source --body-file - <<'EOF_CARD'
 ## Summary
 ...
 EOF_CARD
