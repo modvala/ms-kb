@@ -7,15 +7,13 @@ Notes are plain Markdown with YAML frontmatter: they are readable without Obsidi
 
 | Folder | Note type | File name |
 |---|---|---|
-| `concepts/` | `concept` | `<Title>.md` |
-| `sources/` | `source` | `<Title>.md` |
-| `research/` | `research` | `<slug>.md` |
-| `learning-sessions/` | `learning-session` | `YYYY-MM-DD-<slug>.md` |
-| `projects/` | `project` | `<Title>.md` |
+| `topics/` | `topic`: one current page per topic | `<Title>.md` |
+| `sources/` | `source`: a card for a source kept for later | `<Title>.md` |
 | `attachments/` | images, PDFs | embedded as `![[file.png]]` |
 | `templates/` | note templates | — |
+| `concepts/`, `research/`, `learning-sessions/`, `projects/` | older note types, still readable | — |
 
-`learning_profile.md` is a short summary of what you are learning, with links to the detailed notes.
+`learning_profile.md` holds your current directions and preferences. `kb index` prints the catalogue of topics, `kb index --sources` the source cards.
 
 ## Templates in Obsidian
 
@@ -24,6 +22,7 @@ Use the "Insert template" command in a new note.
 
 ## Rules
 
+- `## In my words` on a topic page is yours: agents save only your exact text there, and a rewrite carries it over unchanged.
 - `kb init` adds missing folders and files and never overwrites existing ones.
 - Run `kb doctor` to check the setup and `kb where` to print this folder's path.
 - This folder is its own Git repository: every `kb` write is a commit, and edits made in Obsidian are committed separately. Never put it inside the ms-kb repository or a project repository.

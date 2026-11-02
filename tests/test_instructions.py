@@ -47,7 +47,7 @@ def test_setup_installs_instruction(vault, isolated_home):
         assert "kb-recall" in text and "add-knowledge" in text
     state = tomllib.loads(installed_path().read_text())
     assert state["instructions"]["targets"] == ["~/.claude/CLAUDE.md", "~/.codex/AGENTS.md"]
-    assert set(state["skills"]) == {"add-knowledge", "kb-recall"}
+    assert set(state["skills"]) == {"add-knowledge", "kb-recall", "save-source"}
 
 
 def test_existing_content_is_preserved(tmp_path, isolated_home, capsys):

@@ -1,7 +1,7 @@
 import tomllib
 
 from ms_kb import __version__
-from ms_kb.cli import main
+from ms_kb.cli import build_parser, main
 from ms_kb.notes import read_note
 from ms_kb.installer import bundled_skills, installed_path, target_dirs
 
@@ -11,7 +11,7 @@ def skill_dir(home, client_dir, name="add-knowledge"):
 
 
 def test_bundled_skills():
-    assert bundled_skills() == ["add-knowledge", "kb-recall"]
+    assert bundled_skills() == ["add-knowledge", "kb-recall", "save-source"]
 
 
 def test_target_dirs(isolated_home):
@@ -27,11 +27,11 @@ def test_setup_installs_skills(vault, isolated_home):
         meta = read_note(skill_dir(isolated_home, d) / "SKILL.md").meta
         assert meta["name"] == "add-knowledge"
         assert meta["metadata"]["package_version"] == __version__
-        assert (skill_dir(isolated_home, d) / "references" / "note-types.md").is_file()
+        assert (skill_dir(isolated_home, d) / "references" / "page-format.md").is_file()
     skills = tomllib.loads(installed_path().read_text())["skills"]
-    for name in ("add-knowledge", "kb-recall"):
+    for name in ("add-knowledge", "kb-recall", "save-source"):
         state = skills[name]
-        assert state["version"] == "0.5.0"
+        assert state["version"] == "0.7.0"
         assert state["package_version"] == __version__
         assert state["targets"] == [f"~/.claude/skills/{name}", f"~/.agents/skills/{name}"]
         assert read_note(skill_dir(isolated_home, ".claude", name) / "SKILL.md").meta["name"] == name
@@ -105,3 +105,34 @@ def test_provenance_warns_when_skill_not_installed(tmp_path, capsys, monkeypatch
     assert main(["new", "concept", "--title", "X", "--topic", "x", "--skill", "add-knowledge", "--body-file", "-"]) == 0
     assert "run kb install-skills" in capsys.readouterr().err
     assert main(["new", "concept", "--title", "Y", "--topic", "x", "--skill", "nope"]) == 1
+
+
+def test_skills_describe_only_commands_that_exist():
+    """A skill that names a kb flag the CLI lacks fails in every client (design §9.1)."""
+    import re
+    from importlib.resources import files
+
+    parser = build_parser()
+    commands = parser._subparsers._group_actions[0].choices
+    for skill in bundled_skills():
+        text = (files("ms_kb") / "skills" / skill / "SKILL.md").read_text()
+        for command, rest in re.findall(r"\bkb ([a-z-]+)((?: [^\n`|]*)?)", text):
+            if command not in commands:
+                continue
+            known = {o for a in commands[command]._actions for o in a.option_strings}
+            for flag in re.findall(r"(?<!\w)--[a-z-]+", rest):
+                assert flag in known, f"{skill}: kb {command} has no {flag}"
+
+
+def test_skill_texts_carry_no_risky_examples():
+    """Design §9.1: no passwords, tokens, sudo or system services in skill texts."""
+    from importlib.resources import files
+
+    for skill in bundled_skills():
+        root = files("ms_kb") / "skills" / skill
+        texts = [(root / "SKILL.md").read_text()]
+        if (root / "references").is_dir():
+            texts += [p.read_text() for p in (root / "references").iterdir()]
+        for text in texts:
+            for word in ("sudo", "password", "launchctl", "systemctl"):
+                assert word not in text.lower(), f"{skill}: {word}"
