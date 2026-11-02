@@ -116,24 +116,26 @@ Then the branch was installed as the real `kb` and skills, and the user ran a ne
 
 The checks after the migration followed the skill steps in the working session against a copy of the real vault, because a headless Claude Code run started from the session has no login. The agent also played the user's answers, so these rows confirm the steps and the guards, not a real dialogue.
 
+Live on the real vault in this session (2026-11-02): `/add-knowledge` on threads created `topics/Threads.md` after one plan with separately approved parts and added three link lines; "проверь меня по потоком" triggered `kb-recall` and ran a review through to `kb my-words`, with the user's text saved verbatim after a yes. The user judged the check sufficient at this point. Never run live, only on the copy: a second `add-knowledge` run rewriting an existing page, a hand-edited line flagged in a real plan, and cards named on a topic.
+
 Found during the migration: `kb restore learning_profile.md` run from a folder holding a file of that name is refused as outside the vault, because a relative path that exists in the current folder wins when the vault has no such file. The refusal is safe; run the command from another folder.
 
 Codex and Cursor are checked later (roadmap stage 7).
 
 | Check | Claude Code | Codex | Cursor |
 |---|---|---|---|
-| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | steps yes, on the copy: two runs changed the same page, a page under its alias refused; a real conversation pending | pending | pending |
+| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | creating yes, live; the second run only on the copy | pending | pending |
 | A draft keeps unchanged sections as they are | yes: the section summary showed only the changed ones | pending | pending |
 | A line edited by hand in Obsidian is flagged in the next plan | yes, on the temporary vault and the copy: uncommitted and committed edits | pending | pending |
 | A stale approval hash and a large shrink are refused | yes: both refused | pending | pending |
 | A second page on the same topic is refused | yes: by alias and by similar title | pending | pending |
 | `kb-recall`: finds a topic, starts from the user's words and open questions | triggered unprompted by "Что я знаю про GIL?" in a new conversation, before the migration, on the old notes; on topic pages the commands yes, a new conversation pending | pending | pending |
-| Review mode: recall first, the page as the reference, writes only a confirmed `## In my words` | started live and asked before testing; the write yes on the copy; a full review with the user pending | pending | pending |
+| Review mode: recall first, the page as the reference, writes only a confirmed `## In my words` | yes, live, on `topics/Threads.md` | pending | pending |
 | `save-source` on an opened article: one card; a second run on the URL proposes extending | yes: a real card in a new conversation; on the temporary vault a URL variant with `utm_source` and a fragment refused, then `kb extend` | pending | pending |
 | `save-source` on a source it cannot open: asks for the text, makes no card without it | no card when the fetch failed; asking for the text pending | pending | pending |
 | `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find the card, a card line in `## Sources` counts as used, on the copy; a real conversation pending | pending | pending |
 | `kb-recall` with `kb` unavailable | `kb where` fails with exit code 1; the answer in a new conversation pending | pending | pending |
-| A skill triggers on its own | `kb-recall` and `save-source` yes ("Что я знаю про GIL?", "Сохрани источник на <URL>"); "quiz me" and `add-knowledge` by phrase pending | pending | pending |
+| A skill triggers on its own | yes for `kb-recall` ("Что я знаю про GIL?", "проверь меня по потоком") and `save-source` ("Сохрани источник на <URL>"); `add-knowledge` was invoked by name | pending | pending |
 | `kb update` installs three skills and the instruction | `kb install-skills` yes; `kb update` pending: needs a release tag | pending | pending |
 | Cursor shows no duplicate skills | — | — | pending |
 | The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1`: `Kb-Agent: claude-code` in the trailers | pending | pending |
