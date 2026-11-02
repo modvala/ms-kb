@@ -114,24 +114,26 @@ Checked in Claude Code (desktop Code tab, 2026-11-02) on branch `stages-5-7`: th
 
 Then the branch was installed as the real `kb` and skills, and the user ran a new conversation against the real vault (2026-11-02): `save-source` showed one card and wrote it after a yes (`sources/Oh-my-mermaid.md`, valid); the review of GIL started by asking, with the page hidden, and was left at its first question. The migration (design §11.7) moved six v1 notes to three topic pages through `kb new topic --created`, `kb link` and `kb rewrite learning_profile.md --allow-shrink`; `kb doctor` is clean.
 
+The checks after the migration followed the skill steps in the working session against a copy of the real vault, because a headless Claude Code run started from the session has no login. The agent also played the user's answers, so these rows confirm the steps and the guards, not a real dialogue.
+
 Found during the migration: `kb restore learning_profile.md` run from a folder holding a file of that name is refused as outside the vault, because a relative path that exists in the current folder wins when the vault has no such file. The refusal is safe; run the command from another folder.
 
 Codex and Cursor are checked later (roadmap stage 7).
 
 | Check | Claude Code | Codex | Cursor |
 |---|---|---|---|
-| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | yes: found through search by the Russian alias; a second run rewrote the same page | pending | pending |
+| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | steps yes, on the copy: two runs changed the same page, a page under its alias refused; a real conversation pending | pending | pending |
 | A draft keeps unchanged sections as they are | yes: the section summary showed only the changed ones | pending | pending |
-| A line edited by hand in Obsidian is flagged in the next plan | yes: `edited by hand on 2026-11-02`; after keeping it, `--since` showed only that line | pending | pending |
+| A line edited by hand in Obsidian is flagged in the next plan | yes, on the temporary vault and the copy: uncommitted and committed edits | pending | pending |
 | A stale approval hash and a large shrink are refused | yes: both refused | pending | pending |
 | A second page on the same topic is refused | yes: by alias and by similar title | pending | pending |
-| `kb-recall`: finds a topic through the index, starts from the user's words and open questions | commands yes; a new conversation pending | pending | pending |
-| Review mode: writes only a confirmed `## In my words` | the write yes: one commit, 2 lines, a changed draft refused; the live review started and is unfinished | pending | pending |
+| `kb-recall`: finds a topic, starts from the user's words and open questions | triggered unprompted by "Что я знаю про GIL?" in a new conversation, before the migration, on the old notes; on topic pages the commands yes, a new conversation pending | pending | pending |
+| Review mode: recall first, the page as the reference, writes only a confirmed `## In my words` | started live and asked before testing; the write yes on the copy; a full review with the user pending | pending | pending |
 | `save-source` on an opened article: one card; a second run on the URL proposes extending | yes: a real card in a new conversation; on the temporary vault a URL variant with `utm_source` and a fragment refused, then `kb extend` | pending | pending |
-| `save-source` on a source it cannot open: makes no card | yes: the fetch failed, no card; asking for the text pending | pending | pending |
-| `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find them; a new conversation pending | pending | pending |
+| `save-source` on a source it cannot open: asks for the text, makes no card without it | no card when the fetch failed; asking for the text pending | pending | pending |
+| `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find the card, a card line in `## Sources` counts as used, on the copy; a real conversation pending | pending | pending |
 | `kb-recall` with `kb` unavailable | `kb where` fails with exit code 1; the answer in a new conversation pending | pending | pending |
-| A skill triggers on its own: "save this", "quiz me on X", "save this source for later" | pending: needs the skills installed in `~/.claude/skills` | pending | pending |
+| A skill triggers on its own | `kb-recall` and `save-source` yes ("Что я знаю про GIL?", "Сохрани источник на <URL>"); "quiz me" and `add-knowledge` by phrase pending | pending | pending |
 | `kb update` installs three skills and the instruction | `kb install-skills` yes; `kb update` pending: needs a release tag | pending | pending |
 | Cursor shows no duplicate skills | — | — | pending |
 | The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1`: `Kb-Agent: claude-code` in the trailers | pending | pending |
