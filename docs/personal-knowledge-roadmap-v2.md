@@ -45,7 +45,7 @@ Done between 2026-10-09 and 2026-10-11; details, results and hands-on checks are
 
 ### Stage 5. Topic pages → v0.6
 
-**Status:** 🟡 Code done. Steps 5a, 5b, 5c and 5e are implemented. Left: 5d, the migration of the real vault, the hands-on check in Claude Code ([clients-v0.md §4.4](clients-v0.md)) and the release.
+**Status:** 🟡 Code done. Steps 5a–5e are done, including the migration of the real vault (2026-11-02). Left: the rest of the hands-on check in Claude Code ([clients-v0.md §4.4](clients-v0.md)) and the release.
 
 **Goal:** the knowledge base works as the user intends — one current page per topic, explicit links, a review mode — and the six existing notes are migrated while that is cheap.
 
@@ -85,7 +85,7 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 - No examples with passwords, tokens, `sudo` or system services in the skill texts.
 - Skill versions bumped to 0.6.0 and asserted in `tests/test_installer.py`.
 
-**5d. Migration of the real vault** (design §11.7) ⬜
+**5d. Migration of the real vault** (design §11.7) ✅
 
 - The agent drafts two or three topic pages from the three concepts and three sessions; the assumption callouts become a short `## Open questions`, confirmed items are dropped.
 - The user deletes the old notes in Obsidian and acknowledges them with `kb doctor --ack`; the agent creates the topic pages with `kb new topic --created <original date>` and links them with `kb link`.
@@ -110,7 +110,7 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 
 ### Stage 6. Sources for later → v0.7
 
-**Status:** 🟡 Code done. Steps 6a, 6b and 6c are implemented. Left: the hands-on check in Claude Code and the release.
+**Status:** 🟡 Code done. Steps 6a, 6b and 6c are implemented. Left: the rest of the hands-on check in Claude Code and the release.
 
 **Goal:** a source the user found interesting but does not want to turn into a topic page yet is saved as a short source card — what it says, its reusable illustrations and how it explains — and comes up again when its topic does (US-02).
 
@@ -227,4 +227,4 @@ Kept as possible directions, not planned: separate `research` / `project` notes 
 - **2.1 — 2026-10-19:** stage 5 extended with the decisions of design 2.1: duplicate checks with aliases and search ranking (5a); `--sections` and the section summary, flags for hand-edited lines and hidden text, `--since`, unlinked mentions on the written page (5b); the updated skill flows, the page as the reference in review, `kb my-words` from both skills, the skills' own format reference and the write rule with other Obsidian skills (5c); tests and "done when" (5e). Backlog: FTS5 cache, embedding duplicates, "keep" markers. Risks: duplicates, reverted hand edits, hidden instructions.
 - **2.2 — 2026-10-19:** sources for later, decided by the user after `reports/Источники на потом: захват и summary.md`. New stage 6 "Sources for later" (v0.7) with steps 6a–6c: the source card in the CLI (`url` or `ref`, duplicates by normalized URL, `kb search --type source`, `kb index --sources` with the count of linking topic pages), the `save-source` skill, `add-knowledge` and `kb-recall` using the cards. Step 5a defines the card contract in `note-schema-v1.md`. Stabilization moves to stage 7 (v1.0) and checks `save-source` too. Backlog: a Web Clipper template (later); `kb attach` frozen; `source` notes and `save-source` leave the frozen list. Risks: cards from unopened sources, copies, unused cards.
 - **2.3 — 2026-11-02:** backlog: saving a Claude artifact unchanged from Claude Code with a `save-artifact` skill (Claude and Claude Code only), with its open questions. No stage changes.
-- **2.4 — 2026-11-02:** the code and documents of stages 5–7 implemented together on one branch; each stage's status line says what is left. Packaged releases wait for the hands-on checks, so the package version stays 0.5.0 until `v0.6.0`. Status 🟡 added for stages whose code is done and whose "Done when" checks are left; finished steps are marked ✅.
+- **2.4 — 2026-11-02:** the code and documents of stages 5–7 implemented together on one branch; each stage's status line says what is left. Packaged releases wait for the hands-on checks, so the package version stays 0.5.0 until `v0.6.0`. Status 🟡 added for stages whose code is done and whose "Done when" checks are left; finished steps are marked ✅. The six v1 notes were migrated to three topic pages on 2026-11-02; the profile holds only directions and preferences, and `kb doctor` is clean.

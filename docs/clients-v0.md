@@ -112,6 +112,10 @@ Found and fixed during the check: `kb doctor` printed `kb restore concepts/Globa
 
 Checked in Claude Code (desktop Code tab, 2026-11-02) on branch `stages-5-7`: the session itself followed the texts of the skills 0.7.0 against a temporary vault, with the CLI from the checkout and a real source (`docs.python.org`). The real vault and the installed skills were not touched. So this covers the skill steps and the CLI behind them, with the agent that wrote them; it does not cover a skill triggering on its own in a new conversation, or a real user answering the plan. Those rows are pending.
 
+Then the branch was installed as the real `kb` and skills, and the user ran a new conversation against the real vault (2026-11-02): `save-source` showed one card and wrote it after a yes (`sources/Oh-my-mermaid.md`, valid); the review of GIL started by asking, with the page hidden, and was left at its first question. The migration (design §11.7) moved six v1 notes to three topic pages through `kb new topic --created`, `kb link` and `kb rewrite learning_profile.md --allow-shrink`; `kb doctor` is clean.
+
+Found during the migration: `kb restore learning_profile.md` run from a folder holding a file of that name is refused as outside the vault, because a relative path that exists in the current folder wins when the vault has no such file. The refusal is safe; run the command from another folder.
+
 Codex and Cursor are checked later (roadmap stage 7).
 
 | Check | Claude Code | Codex | Cursor |
@@ -122,8 +126,8 @@ Codex and Cursor are checked later (roadmap stage 7).
 | A stale approval hash and a large shrink are refused | yes: both refused | pending | pending |
 | A second page on the same topic is refused | yes: by alias and by similar title | pending | pending |
 | `kb-recall`: finds a topic through the index, starts from the user's words and open questions | commands yes; a new conversation pending | pending | pending |
-| Review mode: writes only a confirmed `## In my words` | the write yes: one commit, 2 lines, a changed draft refused; the dialogue with a real user pending | pending | pending |
-| `save-source` on an opened article: one card; a second run on the URL proposes extending | yes: a URL variant with `utm_source` and a fragment refused, then `kb extend` | pending | pending |
+| Review mode: writes only a confirmed `## In my words` | the write yes: one commit, 2 lines, a changed draft refused; the live review started and is unfinished | pending | pending |
+| `save-source` on an opened article: one card; a second run on the URL proposes extending | yes: a real card in a new conversation; on the temporary vault a URL variant with `utm_source` and a fragment refused, then `kb extend` | pending | pending |
 | `save-source` on a source it cannot open: makes no card | yes: the fetch failed, no card; asking for the text pending | pending | pending |
 | `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find them; a new conversation pending | pending | pending |
 | `kb-recall` with `kb` unavailable | `kb where` fails with exit code 1; the answer in a new conversation pending | pending | pending |
