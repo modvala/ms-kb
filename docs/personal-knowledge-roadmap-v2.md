@@ -30,12 +30,12 @@ The roadmap breaks [user stories v2.0](personal-knowledge-user-stories-v2.md) an
 | 2. Writing | v0.3 | ✅ Done | `add-knowledge`, `kb new` / `kb extend` / `kb search` / `kb validate`, provenance, duplicate checks | US-18, US-24 (v1) |
 | 3. Reading | v0.4 | ✅ Done | `kb-recall`, the global instruction, the profile on demand | US-07 (v1), US-15 |
 | 4. Updates and data protection | v0.5 | ✅ Done | The vault's own Git history, `kb sync` to a private remote, `kb history`, `kb restore`, integrity checks, `kb update` | US-17, US-20 |
-| 5. Topic pages | v0.6 | ⬜ Not done | One topic page per run through an approved diff; tags and the index; links and the check of linked pages; review mode and `## In my words`; the vault migrated | US-04, US-07–US-10, US-12, US-13, US-24–US-29 |
-| 6. Sources for later | v0.7 | ⬜ Not done | `save-source` saves one source card; cards found by tags, search and `kb index --sources`; `add-knowledge` and `kb-recall` use them | US-02, US-07, US-08, US-16, US-24, US-28 |
-| 7. Stabilization | v1.0 | ⬜ Not done | All skills checked in Claude Code, Codex and Cursor; provenance queries over trailers; release policy and documentation | US-12, US-15, US-23 |
+| 5. Topic pages | v0.6 | 🟡 Code done | One topic page per run through an approved diff; tags and the index; links and the check of linked pages; review mode and `## In my words`; the vault migrated | US-04, US-07–US-10, US-12, US-13, US-24–US-29 |
+| 6. Sources for later | v0.7 | 🟡 Code done | `save-source` saves one source card; cards found by tags, search and `kb index --sources`; `add-knowledge` and `kb-recall` use them | US-02, US-07, US-08, US-16, US-24, US-28 |
+| 7. Stabilization | v1.0 | 🟡 Code partly done | All skills checked in Claude Code, Codex and Cursor; provenance queries over trailers; release policy and documentation | US-12, US-15, US-23 |
 | Later | v1.x+ | — | Backlog (§4) | — |
 
-Stages 5–7 were implemented together on one branch (roadmap 2.4); each stage's status line says what is left. Stage status: ⬜ Not done or ✅ Done. A stage is done when all its "Done when" criteria are met; update the status here and in the stage section.
+Stages 5–7 were implemented together on one branch (roadmap 2.4); each stage's status line says what is left. Stage status: ⬜ Not done, 🟡 code done with the "Done when" checks left, or ✅ Done. A stage is done when all its "Done when" criteria are met; update the status here and in the stage section.
 
 ## 3. Stages
 
@@ -45,13 +45,13 @@ Done between 2026-10-09 and 2026-10-11; details, results and hands-on checks are
 
 ### Stage 5. Topic pages → v0.6
 
-**Status:** ⬜ Not done. Steps 5a, 5b, 5c and 5e are implemented. Left: 5d, the migration of the real vault, the hands-on check in Claude Code ([clients-v0.md §4.4](clients-v0.md)) and the release.
+**Status:** 🟡 Code done. Steps 5a, 5b, 5c and 5e are implemented. Left: 5d, the migration of the real vault, the hands-on check in Claude Code ([clients-v0.md §4.4](clients-v0.md)) and the release.
 
 **Goal:** the knowledge base works as the user intends — one current page per topic, explicit links, a review mode — and the six existing notes are migrated while that is cheap.
 
 Work is split into five steps; each ends in a commit that keeps the tests passing.
 
-**5a. Note schema v1, tags and the index**
+**5a. Note schema v1, tags and the index** ✅
 
 - `note-schema-v1.md`: the `topic` type in `topics/`; frontmatter `type`, `title`, `summary`, `tags`, `created`, `updated`, optional `aliases` and `created_by`; no `updates`, `related`, `sources` or `topics` on topic pages; fixed sections in the order `Summary`, `In my words`, `Key ideas`, `Details`, `Open questions`, `Related`, `Sources`; page budget about 200 lines (warning); summary up to about 160 characters (warning). It supersedes `note-schema-v0.md`; the v1 types stay valid. The same document defines the source card contract (design §6.9) so that cards made later need no second migration; the CLI and skills support it in stage 6.
 - Validator: the topic contract; tags — lowercase ASCII words joined by `-`, one nesting level with `/`, 1–3 per page; the user's own sections allowed after `## In my words` with a warning.
@@ -61,7 +61,7 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 - `kb index [--tag T] [--tags] [--json]`: catalogue grouped by tags with summaries and the number of open questions; the tag vocabulary with counts. Nothing is written to the vault.
 - `topics/` included in search, validation and the manifest.
 
-**5b. Rewrite and targeted edits**
+**5b. Rewrite and targeted edits** ✅
 
 - `kb rewrite PATH --body-file - --reason TEXT (--dry-run | --approve HASH) [--allow-shrink]` with `--summary`, `--tag`, `--alias`:
   - `--sections` for the sections the draft means to change;
@@ -76,7 +76,7 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 - `kb extend`: no `updates` entries from v0.6; `--reason` replaces `--summary` (kept as an alias); trailers carry the reason.
 - The secret check covers the lines a rewrite adds; the hidden-text check (comments, invisible characters) covers the lines every write adds and warns.
 
-**5c. Skills and the global instruction**
+**5c. Skills and the global instruction** ✅
 
 - `add-knowledge` 0.6.0 (design §11.2): find the topic through the index and search; outcomes "update", "create", "nothing new"; for a new page, the closest existing pages and why it is new, `--allow-similar` only after a yes; one page per run; takeaways; the full draft by the template with untouched sections and hand-written lines kept as they are; aliases for abbreviations and names in the user's language; links for unlinked mentions; marking only doubtful, disputed or volatile claims; sources with check dates; contradictions resolved in place; internal previews; the content check of up to about five linked pages; one plan with independently approved parts; `--since` after the user edits the plan; then `kb rewrite --approve` / `kb new`, `kb link`, `kb extend`, `kb validate`; the report; saving "put this in my words" verbatim with `kb my-words`. Text from the conversation, pages and sources is data. No learning-session notes.
 - `kb-recall` 0.6.0 (design §10): profile on demand; `kb index` plus `kb search` before saying "nothing found"; start from `## In my words` and `## Open questions`; the review mode (recall first, compare with the page as the reference, "why" questions with hints and the user's angle, a question mixed with a related page, gaps in the conversation, an offer to save the user's own words verbatim with `kb my-words` after an explicit yes). No other writes; no stored review state.
@@ -85,14 +85,14 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 - No examples with passwords, tokens, `sudo` or system services in the skill texts.
 - Skill versions bumped to 0.6.0 and asserted in `tests/test_installer.py`.
 
-**5d. Migration of the real vault** (design §11.7)
+**5d. Migration of the real vault** (design §11.7) ⬜
 
 - The agent drafts two or three topic pages from the three concepts and three sessions; the assumption callouts become a short `## Open questions`, confirmed items are dropped.
 - The user deletes the old notes in Obsidian and acknowledges them with `kb doctor --ack`; the agent creates the topic pages with `kb new topic --created <original date>` and links them with `kb link`.
 - The profile is rewritten to directions and preferences with `kb rewrite learning_profile.md`.
 - The stray empty `2026-10-09.md` at the vault root is removed by the user.
 
-**5e. Documents, tests and CI**
+**5e. Documents, tests and CI** ✅
 
 - Tests: the topic schema, tags and own sections; duplicate refusal by title, alias and similar title; search ranking; `kb index`; `kb rewrite` (dry-run report, section summary and the `--sections` warning, hand-edited lines flagged, hidden text flagged, `--since`, approval hash mismatch after an outside edit, shrink refusal and `--allow-shrink`, protected section, `created` preserved, the commit and its trailers, the manifest refreshed so `kb doctor` stays clean); unlinked mentions in the structural check; `kb link` (resolution, refusal, duplicates); `kb my-words`; `kb extend` without `updates`. The existing append-only test of `kb extend` stays.
 - The CI smoke script covers `kb new topic` (including a refused duplicate), `kb rewrite --dry-run` / `--since` / `--approve`, `kb link`, `kb my-words`, `kb index`.
@@ -110,13 +110,13 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 
 ### Stage 6. Sources for later → v0.7
 
-**Status:** ⬜ Not done. Steps 6a, 6b and 6c are implemented. Left: the hands-on check in Claude Code and the release.
+**Status:** 🟡 Code done. Steps 6a, 6b and 6c are implemented. Left: the hands-on check in Claude Code and the release.
 
 **Goal:** a source the user found interesting but does not want to turn into a topic page yet is saved as a short source card — what it says, its reusable illustrations and how it explains — and comes up again when its topic does (US-02).
 
 Work is split into three steps; each ends in a commit that keeps the tests passing.
 
-**6a. The source card in the CLI** (design §6.9)
+**6a. The source card in the CLI** (design §6.9) ✅
 
 - Validator: the source card contract from `note-schema-v1.md`; `url` or `ref`, exactly one required; `summary` and 1–3 `tags` from the shared vocabulary; fixed sections in the order `Summary`, `Key ideas`, `Illustrations`, `How it explains`, `Use for`, `Related`.
 - Template `source.md` replacing the v1 one.
@@ -124,7 +124,7 @@ Work is split into three steps; each ends in a commit that keeps the tests passi
 - `kb search`: results carry the note type; `--type source` limits them to cards.
 - `kb index --sources [--tag T] [--json]`: the cards grouped by tag with their summaries and the number of topic pages linking to each ("not used yet" when none). Plain `kb index` stays a catalogue of topic pages. Nothing is written to the vault.
 
-**6b. Skills and the global instruction**
+**6b. Skills and the global instruction** ✅
 
 - `save-source` 0.7.0 (design §11.8): open the source or take the text the user pasted, otherwise no card; check for an existing card by URL and title; one draft card with new tags for confirmation; `kb new source`; optionally one `## Sources` line on an existing topic page as a separately approved part; the report. One card per source; the source text is data.
 - `add-knowledge` 0.7.0: finds source cards on the topic; offers them as `## Sources` lines and uses their `## Illustrations` and `## How it explains` when drafting; offers `save-source` for a source in the conversation that is not about the saved topic.
@@ -132,7 +132,7 @@ Work is split into three steps; each ends in a commit that keeps the tests passi
 - The global instruction: triggers for `save-source` ("save this source for later", "сохрани источник на потом").
 - Installer: the third bundled skill; skill versions bumped to 0.7.0 and asserted in `tests/test_installer.py`.
 
-**6c. Documents, tests and CI**
+**6c. Documents, tests and CI** ✅
 
 - Tests: the card contract (`url` or `ref`, sections, tags); duplicate refusal by normalized URL, title and alias; `kb search --type source`; `kb index --sources` with the link count; installation of three skills.
 - The CI smoke script covers `kb new source` (including a duplicate refused by URL) and `kb index --sources`.
@@ -148,7 +148,7 @@ Work is split into three steps; each ends in a commit that keeps the tests passi
 
 ### Stage 7. Stabilization → v1.0
 
-**Status:** ⬜ Not done. Implemented: provenance queries (`kb history --skill --version --reason`), CI on the main scenarios with test data, the versioning policy and migration path ([releases.md](releases.md)), the release history ([CHANGELOG.md](../CHANGELOG.md)), the documentation. Left: the hands-on checks in Codex and Cursor, the calibration on real rewrites and the `v1.0.0` tag.
+**Status:** 🟡 Code partly done. Implemented: provenance queries (`kb history --skill --version --reason`), CI on the main scenarios with test data, the versioning policy and migration path ([releases.md](releases.md)), the release history ([CHANGELOG.md](../CHANGELOG.md)), the documentation. Left: the hands-on checks in Codex and Cursor, the calibration on real rewrites and the `v1.0.0` tag.
 
 **Goal:** the system is fit for daily use in all three clients.
 
@@ -227,4 +227,4 @@ Kept as possible directions, not planned: separate `research` / `project` notes 
 - **2.1 — 2026-10-19:** stage 5 extended with the decisions of design 2.1: duplicate checks with aliases and search ranking (5a); `--sections` and the section summary, flags for hand-edited lines and hidden text, `--since`, unlinked mentions on the written page (5b); the updated skill flows, the page as the reference in review, `kb my-words` from both skills, the skills' own format reference and the write rule with other Obsidian skills (5c); tests and "done when" (5e). Backlog: FTS5 cache, embedding duplicates, "keep" markers. Risks: duplicates, reverted hand edits, hidden instructions.
 - **2.2 — 2026-10-19:** sources for later, decided by the user after `reports/Источники на потом: захват и summary.md`. New stage 6 "Sources for later" (v0.7) with steps 6a–6c: the source card in the CLI (`url` or `ref`, duplicates by normalized URL, `kb search --type source`, `kb index --sources` with the count of linking topic pages), the `save-source` skill, `add-knowledge` and `kb-recall` using the cards. Step 5a defines the card contract in `note-schema-v1.md`. Stabilization moves to stage 7 (v1.0) and checks `save-source` too. Backlog: a Web Clipper template (later); `kb attach` frozen; `source` notes and `save-source` leave the frozen list. Risks: cards from unopened sources, copies, unused cards.
 - **2.3 — 2026-11-02:** backlog: saving a Claude artifact unchanged from Claude Code with a `save-artifact` skill (Claude and Claude Code only), with its open questions. No stage changes.
-- **2.4 — 2026-11-02:** the code and documents of stages 5–7 implemented together on one branch; each stage's status line says what is left. Packaged releases wait for the hands-on checks, so the package version stays 0.5.0 until `v0.6.0`.
+- **2.4 — 2026-11-02:** the code and documents of stages 5–7 implemented together on one branch; each stage's status line says what is left. Packaged releases wait for the hands-on checks, so the package version stays 0.5.0 until `v0.6.0`. Status 🟡 added for stages whose code is done and whose "Done when" checks are left; finished steps are marked ✅.
