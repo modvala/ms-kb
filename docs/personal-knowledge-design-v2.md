@@ -18,7 +18,7 @@ This document describes the architecture of ms-kb: the content model, the CLI an
 
 What changes in v2: the content model moves from learning sessions and append-only notes to **topic pages** that are rewritten in place through an approved diff (§5, §6, §11), with a generated index, tags, explicit links, a check of linked pages when writing, a review mode and a protected `## In my words` section. What stays: delivery (§4), the split between CLI and skills (§9.1), storage, history and data protection (§12), with the trust boundary of §12.4 revised for rewrites.
 
-Status of the parts: everything marked **v0.6** is planned for roadmap stage 5 and everything marked **v0.7** (source cards, §6.9, §11.8) for stage 6; both are implemented on the way to their releases and wait for the hands-on checks of the roadmap; the rest is in package v0.5.0. The limits marked as provisional are calibrated in stage 7; the final note schema is [note-schema-v1.md](note-schema-v1.md).
+Status of the parts: everything marked **v0.6** is planned for roadmap stage 5 and everything marked **v0.7** (source cards, §6.9, §11.8) for stage 6; both were released together in package v0.7.0; the rest is in v0.5.0. The limits marked as provisional are calibrated in stage 7; the final note schema is [note-schema-v1.md](note-schema-v1.md).
 
 Background: the LLM Wiki research (`reports/LLM Wiki Карпати для базы знаний.md`, 2026-10-12) compared the pattern of Andrej Karpathy's gist and about 15 community implementations with ms-kb. ms-kb takes the core of the pattern (pages compiled by the agent and kept current, a generated index, explicit links, checks) and leaves out the agent's autonomy (raw-source folders, `log.md`, cascades of edits across 10–15 pages, automatic filing of answers).
 

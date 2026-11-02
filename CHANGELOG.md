@@ -2,9 +2,9 @@
 
 Versioning policy and migration path: [docs/releases.md](docs/releases.md).
 
-## Unreleased (planned v0.6, v0.7)
+## 0.7.0 — 2026-11-02
 
-Implemented, waiting for the hands-on checks and the migration of the real vault before the release.
+Closes roadmap stages 5 and 6 in one release, because their code and skills were built together; there is no v0.6.0.
 
 ### Added
 
