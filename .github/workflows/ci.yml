@@ -36,6 +36,8 @@ jobs:
           kb doctor
           test "$(kb where)" = "$(cd "$VAULT" && pwd -P)"
           test -f "$VAULT/templates/concept.md"
+          test -f "$VAULT/templates/topic.md"
+          test -f "$HOME/.claude/skills/save-source/SKILL.md"
           test -f "$VAULT/learning_profile.md"
           test -f "$HOME/.claude/skills/add-knowledge/SKILL.md"
           test -f "$HOME/.agents/skills/add-knowledge/SKILL.md"
@@ -45,7 +47,7 @@ jobs:
             | kb extend concepts/RAG.md --summary "Added an insight" --skill add-knowledge --body-file -
           if kb new concept --title rag --topic rag; then echo "duplicate was not refused"; exit 1; fi
           kb search rag --json | grep -q '"title": "RAG"'
-          kb search --field updates.skill=add-knowledge | grep -q RAG.md
+          kb search --field created_by.skill=add-knowledge | grep -q RAG.md
           kb validate
           # History: a commit per write with provenance trailers (design §12.1)
           git -C "$VAULT" log -1 --format=%B | grep -q 'Kb-Skill: add-knowledge'
@@ -69,3 +71,67 @@ jobs:
           # The vault survives losing the local folder
           git clone -q "$REMOTE" "$CLONE"
           test -f "$CLONE/concepts/RAG.md"
+          # Topic pages: duplicates, the diff gate, links, the user's words, the index (design §13)
+          PAGE='topics/Python concurrency.md'
+          printf '## Summary\nThreads and processes.\n\n## Key ideas\n- The load decides, and a longer line keeps the body large enough.\n\n## Details\nThreads share memory. Processes do not share it.\n' > "$RUNNER_TEMP/draft1.md"
+          kb new topic --title 'Python concurrency' --summary 'How to choose' --tag python/concurrency --alias GIL \
+            --skill add-knowledge --body-file "$RUNNER_TEMP/draft1.md"
+          if kb new topic --title 'python  concurrency' --summary s --tag python --body-file "$RUNNER_TEMP/draft1.md"; then
+            echo "duplicate topic was not refused"; exit 1
+          fi
+          if kb new topic --title GIL --summary s --tag python --body-file "$RUNNER_TEMP/draft1.md"; then
+            echo "duplicate alias was not refused"; exit 1
+          fi
+          printf 'Если ждёт — потоки.\n' | kb my-words "$PAGE" --skill kb-recall --body-file -
+          # A line edited by hand is flagged in the next report
+          perl -pi -e 's/Threads share memory\./Threads share memory (by hand)./' "$VAULT/$PAGE"
+          kb sync --quiet || true
+          sed 's/The load decides/The kind of load decides/' "$RUNNER_TEMP/draft1.md" > "$RUNNER_TEMP/draft2.md"
+          REPORT=$(kb rewrite "$PAGE" --reason 'Reworded' --sections Details --body-file "$RUNNER_TEMP/draft2.md" --dry-run)
+          echo "$REPORT" | grep -q 'changes outside --sections: Key ideas'
+          echo "$REPORT" | grep -q 'edited by hand on .*(by hand)'
+          echo "$REPORT" | grep -q 'carried over unchanged'
+          HASH1=$(echo "$REPORT" | sed -n 's/^approval hash: //p')
+          sed 's/Threads and processes/Threads, processes/' "$RUNNER_TEMP/draft2.md" > "$RUNNER_TEMP/draft3.md"
+          REPORT=$(kb rewrite "$PAGE" --reason 'Reworded' --body-file "$RUNNER_TEMP/draft3.md" --dry-run --since "$HASH1")
+          echo "$REPORT" | grep -q "since the reviewed draft $HASH1"
+          HASH=$(echo "$REPORT" | sed -n 's/^approval hash: //p')
+          if kb rewrite "$PAGE" --reason 'Reworded' --body-file "$RUNNER_TEMP/draft3.md" --approve "$HASH1"; then
+            echo "stale hash was not refused"; exit 1
+          fi
+          kb rewrite "$PAGE" --reason 'Reworded' --skill add-knowledge --body-file "$RUNNER_TEMP/draft3.md" --approve "$HASH"
+          grep -q 'Если ждёт — потоки.' "$VAULT/$PAGE"
+          git -C "$VAULT" log -1 --format=%B | grep -q 'Kb-Reason: Reworded'
+          # The guards: a large shrink and a changed ## In my words
+          printf '## Summary\nShort.\n' > "$RUNNER_TEMP/short.md"
+          HASH=$(kb rewrite "$PAGE" --reason 'Cut' --body-file "$RUNNER_TEMP/short.md" --dry-run | sed -n 's/^approval hash: //p')
+          if kb rewrite "$PAGE" --reason 'Cut' --body-file "$RUNNER_TEMP/short.md" --approve "$HASH"; then
+            echo "shrink was not refused"; exit 1
+          fi
+          if printf '## Summary\nS.\n\n## In my words\nAgent text.\n' | kb rewrite "$PAGE" --reason r --body-file - --dry-run; then
+            echo "protected section was not refused"; exit 1
+          fi
+          kb link "$PAGE" RAG --why 'an unrelated neighbour'
+          grep -q '\[\[RAG\]\] — an unrelated neighbour' "$VAULT/$PAGE"
+          if kb link "$PAGE" Nowhere --why x; then echo "unresolved link was not refused"; exit 1; fi
+          kb index | grep -q '\[\[Python concurrency\]\] — How to choose (0 open questions)'
+          kb index --tag python --json | grep -q '"title": "Python concurrency"'
+          kb index --tags | grep -q 'python/concurrency  1'
+          kb search --tag python | grep -q 'Python concurrency'
+          # Source cards: duplicates by URL, the count of linking topic pages
+          printf '## Summary\nA card.\n' | kb new source --title 'An article' --summary 'Worth keeping' \
+            --url 'https://example.com/a' --tag python/concurrency --skill save-source --body-file -
+          if printf '## Summary\nA card.\n' | kb new source --title 'Another name' --summary s \
+            --url 'HTTPS://EXAMPLE.com/a/?utm_source=x' --tag python --body-file -; then
+            echo "duplicate URL was not refused"; exit 1
+          fi
+          kb index --sources | grep -q '\[\[An article\]\] — Worth keeping — not used yet'
+          printf '## Sources\n- [[An article]] — threads — checked 2026-10-20\n' \
+            | kb extend "$PAGE" --reason 'Card' --skill save-source --body-file -
+          kb index --sources | grep -q 'used by 1 topic'
+          kb search article --type source | grep -q 'An article'
+          # Provenance queries over the trailers (roadmap stage 7)
+          kb history --skill save-source | grep -q 'kb: create sources/An article.md'
+          kb history "$PAGE" --reason reworded | grep -q 'kb: rewrite'
+          kb validate
+          kb doctor
