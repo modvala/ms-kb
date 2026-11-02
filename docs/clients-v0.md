@@ -136,7 +136,7 @@ Codex and Cursor are checked later (roadmap stage 7).
 | `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find the card, a card line in `## Sources` counts as used, on the copy; a real conversation pending | pending | pending |
 | `kb-recall` with `kb` unavailable | `kb where` fails with exit code 1; the answer in a new conversation pending | pending | pending |
 | A skill triggers on its own | yes for `kb-recall` ("Что я знаю про GIL?", "проверь меня по потоком") and `save-source` ("Сохрани источник на <URL>"); `add-knowledge` was invoked by name | pending | pending |
-| `kb update` installs three skills and the instruction | `kb install-skills` yes; `kb update` pending: needs a release tag | pending | pending |
+| `kb update` installs three skills and the instruction | yes: `kb update --ref v0.7.0` on the real install, 0.5.0 → 0.7.0, the vault untouched, `kb doctor` clean | pending | pending |
 | Cursor shows no duplicate skills | — | — | pending |
 | The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1`: `Kb-Agent: claude-code` in the trailers | pending | pending |
 
