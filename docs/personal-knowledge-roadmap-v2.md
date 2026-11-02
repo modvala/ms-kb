@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "2.2"
+document_version: "2.3"
 created: "2026-10-12"
 language: en
 status: draft
@@ -11,7 +11,7 @@ design_ref: "personal-knowledge-design-v2.md"
 design_version: "2.2"
 ---
 
-# Personal Knowledge System — Roadmap v2.2
+# Personal Knowledge System — Roadmap v2.3
 
 ## 1. Purpose
 
@@ -171,6 +171,7 @@ Ordered roughly by closeness to the current value.
 
 | Direction | What it gives | When |
 |---|---|---|
+| Saving a Claude artifact unchanged from Claude Code: a `save-artifact` skill takes a link to an artifact or a file downloaded from a Claude chat, shows what will be saved and writes it through `kb` after a yes. Claude and Claude Code only. To decide first: which note type holds unchanged text (neither a source card nor a topic page does), what to do with HTML artifacts, and whether artifacts from chats open by link or need the file | Summaries and artifacts made in Claude chats reach the knowledge base as they are, without a plugin or MCP | When those questions are decided; before implementation it needs a user story and a design section |
 | Read-only structure report in `kb doctor`: orphan pages, links to pages that never existed (with the closest title), pages over budget, missing `summary`, files outside the type folders, near-duplicate titles | A cheap overview without any model or edits | Right after stage 7, or when the base passes a few dozen pages |
 | `kb related PATH`: suggested related pages with reasons (shared links, pages citing both, shared tags) | Finding neighbours when search is not enough | When neighbours become hard to find |
 | `kb rename`, `kb merge`, `kb unlink` with backlink updates, aliases as redirects, a stable note `id` | Fixing duplicate topics and renames safely | At the first duplicate topic |
@@ -225,3 +226,4 @@ Kept as possible directions, not planned: separate `research` / `project` notes 
 - **2.0 — 2026-10-12:** roadmap restated after stage 4 and the LLM Wiki research. Stages 0–4 summarized with a link to v1.9. New stage 5 "Topic pages" (v0.6) with steps 5a–5e; stabilization moved to stage 6 (v1.0) with checks of the new skills, calibration and provenance queries over trailers. Backlog split into later, frozen and not doing. Risks updated for page rewrites. The history of versions 1.0–1.9 is in [personal-knowledge-roadmap-v1.md](personal-knowledge-roadmap-v1.md).
 - **2.1 — 2026-10-19:** stage 5 extended with the decisions of design 2.1: duplicate checks with aliases and search ranking (5a); `--sections` and the section summary, flags for hand-edited lines and hidden text, `--since`, unlinked mentions on the written page (5b); the updated skill flows, the page as the reference in review, `kb my-words` from both skills, the skills' own format reference and the write rule with other Obsidian skills (5c); tests and "done when" (5e). Backlog: FTS5 cache, embedding duplicates, "keep" markers. Risks: duplicates, reverted hand edits, hidden instructions.
 - **2.2 — 2026-10-19:** sources for later, decided by the user after `reports/Источники на потом: захват и summary.md`. New stage 6 "Sources for later" (v0.7) with steps 6a–6c: the source card in the CLI (`url` or `ref`, duplicates by normalized URL, `kb search --type source`, `kb index --sources` with the count of linking topic pages), the `save-source` skill, `add-knowledge` and `kb-recall` using the cards. Step 5a defines the card contract in `note-schema-v1.md`. Stabilization moves to stage 7 (v1.0) and checks `save-source` too. Backlog: a Web Clipper template (later); `kb attach` frozen; `source` notes and `save-source` leave the frozen list. Risks: cards from unopened sources, copies, unused cards.
+- **2.3 — 2026-11-02:** backlog: saving a Claude artifact unchanged from Claude Code with a `save-artifact` skill (Claude and Claude Code only), with its open questions. No stage changes.
