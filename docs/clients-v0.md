@@ -108,25 +108,29 @@ Run on the real vault `~/Knowledge/main` (Claude Code desktop Code tab, 2026-10-
 
 Found and fixed during the check: `kb doctor` printed `kb restore concepts/Global Interpreter Lock.md` without quotes, so the suggested command failed in a shell; paths in hints are now shell-quoted.
 
-### 4.4. Stages 5–7: topic pages, review, source cards (pending)
+### 4.4. Stages 5–7: topic pages, review, source cards
 
-The skills 0.7.0 and the CLI are covered by tests and the CI smoke script on test data. Nothing here has been run by hand yet.
+Checked in Claude Code (desktop Code tab, 2026-11-02) on branch `stages-5-7`: the session itself followed the texts of the skills 0.7.0 against a temporary vault, with the CLI from the checkout and a real source (`docs.python.org`). The real vault and the installed skills were not touched. So this covers the skill steps and the CLI behind them, with the agent that wrote them; it does not cover a skill triggering on its own in a new conversation, or a real user answering the plan. Those rows are pending.
+
+Codex and Cursor are checked later (roadmap stage 7).
 
 | Check | Claude Code | Codex | Cursor |
 |---|---|---|---|
-| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | pending | pending | pending |
-| A draft keeps unchanged sections as they are (`--sections` warning stays quiet); practitioners report Codex rewriting whole pages | pending | pending | pending |
-| A line edited by hand in Obsidian is flagged in the next plan | pending | pending | pending |
-| A second page on the same topic is refused and the skill updates the first | pending | pending | pending |
-| `kb-recall`: finds a topic through the index, starts from the user's words and open questions | pending | pending | pending |
-| Review mode: recall first, the page as the reference, writes only a confirmed `## In my words` | pending | pending | pending |
-| `save-source` on an opened article: one card after one approval; a second run on the URL proposes extending | pending | pending | pending |
-| `save-source` on a source it cannot open: asks for the text, makes no card without it | pending | pending | pending |
-| `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | pending | pending | pending |
-| `kb-recall` with `kb` unavailable | pending | pending | pending |
-| `kb update` installs three skills and the instruction | pending | pending | pending |
+| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | yes: found through search by the Russian alias; a second run rewrote the same page | pending | pending |
+| A draft keeps unchanged sections as they are | yes: the section summary showed only the changed ones | pending | pending |
+| A line edited by hand in Obsidian is flagged in the next plan | yes: `edited by hand on 2026-11-02`; after keeping it, `--since` showed only that line | pending | pending |
+| A stale approval hash and a large shrink are refused | yes: both refused | pending | pending |
+| A second page on the same topic is refused | yes: by alias and by similar title | pending | pending |
+| `kb-recall`: finds a topic through the index, starts from the user's words and open questions | commands yes; a new conversation pending | pending | pending |
+| Review mode: writes only a confirmed `## In my words` | the write yes: one commit, 2 lines, a changed draft refused; the dialogue with a real user pending | pending | pending |
+| `save-source` on an opened article: one card; a second run on the URL proposes extending | yes: a URL variant with `utm_source` and a fragment refused, then `kb extend` | pending | pending |
+| `save-source` on a source it cannot open: makes no card | yes: the fetch failed, no card; asking for the text pending | pending | pending |
+| `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | the commands find them; a new conversation pending | pending | pending |
+| `kb-recall` with `kb` unavailable | `kb where` fails with exit code 1; the answer in a new conversation pending | pending | pending |
+| A skill triggers on its own: "save this", "quiz me on X", "save this source for later" | pending: needs the skills installed in `~/.claude/skills` | pending | pending |
+| `kb update` installs three skills and the instruction | `kb install-skills` yes; `kb update` pending: needs a release tag | pending | pending |
 | Cursor shows no duplicate skills | — | — | pending |
-| The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1` | pending | pending |
+| The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1`: `Kb-Agent: claude-code` in the trailers | pending | pending |
 
 ## 5. Portable `SKILL.md` v0
 
@@ -156,4 +160,4 @@ metadata:
 - **0.4 — 2026-10-11:** roadmap stage 4: the hands-on check of history, `kb sync`, `kb restore` and `kb update` on the real vault (§4.3).
 - **0.5 — 2026-10-12:** the hands-on checks in Codex and Cursor move to roadmap stage 6 (stabilization), after the new stage 5 "Topic pages" ([roadmap v2.0](personal-knowledge-roadmap-v2.md)); design reference updated to [design v2](personal-knowledge-design-v2.md).
 - **0.6 — 2026-10-19:** the hands-on checks in Codex and Cursor move to roadmap stage 7 (stabilization), after the new stage 6 "Sources for later" ([roadmap v2.2](personal-knowledge-roadmap-v2.md)).
-- **0.7 — 2026-11-02:** the checklist of stages 5–7 (§4.4), all pending.
+- **0.7 — 2026-11-02:** the checklist of stages 5–7 and its first results in Claude Code on a temporary vault (§4.4).
