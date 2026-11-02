@@ -55,7 +55,7 @@ def target_dirs(clients: list[str]) -> list[Path]:
 
 
 def installed_path() -> Path:
-    """State, not settings: kept next to the configuration (note-schema-v0 §6)."""
+    """State, not settings: kept next to the configuration (note-schema-v1 §6)."""
     return config_path().parent / "installed.toml"
 
 

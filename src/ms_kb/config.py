@@ -1,4 +1,4 @@
-"""User configuration: ~/.config/ms-kb/config.toml (note-schema-v0 §6)."""
+"""User configuration: ~/.config/ms-kb/config.toml (note-schema-v1 §6)."""
 
 import os
 import tomllib

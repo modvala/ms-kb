@@ -1,8 +1,8 @@
 ---
 title: "Personal Knowledge System — Design & Contracts"
-document_version: "2.2"
+document_version: "2.3"
 created: "2026-10-12"
-updated: "2026-10-19"
+updated: "2026-11-02"
 language: en
 status: discussion_baseline
 supersedes: "personal-knowledge-design-v1.md (1.13)"
@@ -10,7 +10,7 @@ requirements_ref: "personal-knowledge-user-stories-v2.md"
 requirements_version: "2.2"
 ---
 
-# Personal Knowledge System — Design & Contracts v2.2
+# Personal Knowledge System — Design & Contracts v2.3
 
 ## 1. Purpose and status
 
@@ -18,7 +18,7 @@ This document describes the architecture of ms-kb: the content model, the CLI an
 
 What changes in v2: the content model moves from learning sessions and append-only notes to **topic pages** that are rewritten in place through an approved diff (§5, §6, §11), with a generated index, tags, explicit links, a check of linked pages when writing, a review mode and a protected `## In my words` section. What stays: delivery (§4), the split between CLI and skills (§9.1), storage, history and data protection (§12), with the trust boundary of §12.4 revised for rewrites.
 
-Status of the parts: everything marked **v0.6** is planned for roadmap stage 5 and everything marked **v0.7** (source cards, §6.9, §11.8) for stage 6; neither is implemented yet; the rest is implemented in package v0.5.0. Field names, command names and limits marked as provisional may change when stage 5 is implemented; the final note schema goes to `note-schema-v1.md`.
+Status of the parts: everything marked **v0.6** is planned for roadmap stage 5 and everything marked **v0.7** (source cards, §6.9, §11.8) for stage 6; both are implemented on the way to their releases and wait for the hands-on checks of the roadmap; the rest is in package v0.5.0. The limits marked as provisional are calibrated in stage 7; the final note schema is [note-schema-v1.md](note-schema-v1.md).
 
 Background: the LLM Wiki research (`reports/LLM Wiki Карпати для базы знаний.md`, 2026-10-12) compared the pattern of Andrej Karpathy's gist and about 15 community implementations with ms-kb. ms-kb takes the core of the pattern (pages compiled by the agent and kept current, a generated index, explicit links, checks) and leaves out the agent's autonomy (raw-source folders, `log.md`, cascades of edits across 10–15 pages, automatic filing of answers).
 
@@ -144,7 +144,7 @@ Similarity by embeddings is in the backlog; it is not needed at the current size
 - Links are stored once, in the body. The frontmatter `related` list of v1 is not used for topic pages; Obsidian Bases can still filter by `file.links`.
 - A link is written only to a page that exists or to one of its `aliases`; `kb` resolves it with the same rules as Obsidian (shortest path, aliases) and refuses unresolved targets.
 - Links inside the text (`[[Target]]` in a sentence) are allowed; `## Related` lists the connections worth navigating and reviewing.
-- **Unlinked mentions on the written page** (v2.1): when a page is written, the CLI reports titles and aliases of existing pages that the page mentions without a link (§11.4), and the skill turns the useful ones into links on that page. Only the written page changes; the pages it now links to then get the usual back-link suggestion. Mentions of the page on other pages are not searched.
+- **Unlinked mentions on the written page** (v2.1): when a page is written, the CLI reports titles and aliases of existing pages that the page mentions without a link (§11.4), and the skill turns the useful ones into links on that page. Only the written page changes; the pages it now links to then get the usual back-link suggestion. Mentions of the page on other pages are not searched. A page already linked from this one is not reported again, and `## In my words` is left out of the scan, since it is the user's text.
 - Typed link vocabularies (`depends_on`, `contrasts_with` as data) are not used: the phrase carries the meaning.
 
 ### 5.3. Tags
@@ -546,6 +546,15 @@ The write goes through the same path as every write (`_finish`): lock, commit of
 
 `kb rewrite learning_profile.md` uses the same gate for the profile (no provenance block, the reason goes to the commit).
 
+Decided during implementation (v2.3):
+
+- `kb rewrite` works only on topic pages and the profile: source cards and v1 notes stay append-only.
+- A draft is a body: a draft with frontmatter is refused, and metadata changes only through `--summary`, `--tag` and `--alias`. A draft that leaves out `## In my words` gets it from the current file; only a draft that changes it is refused.
+- The fixed sections other than `## Summary` may be absent from a draft; what disappears is in the report.
+- A dry-run of a large shrink prints the full report with the refusal in it, so the user can decide; `--approve` is what refuses.
+- The approval hash covers the rendered file, `updated` included, so a preview approved on a later day asks for a new review.
+- The reason is checked for secrets, because it stays in the history.
+
 ### 11.4. Checking linked pages
 
 The check covers the page being written and the pages it links to — one step, no neighbours of neighbours. Pages that are not linked are not read or changed.
@@ -585,6 +594,8 @@ Rules for the skills:
 - The text is the user's, verbatim: no rewording, no fixing of typos, no translation, no additions.
 - Before calling the command, the agent shows the exact text and the page, and calls it only after an explicit yes.
 - The agent never drafts the text for the user. If the user's formulation contradicts the page, the agent says so in the conversation and may propose an open question; the section is saved as the user wants it.
+
+The command refuses an empty text and a text with a `#` or `##` heading, which would split the section. `kb new topic` refuses text in the section, and `kb extend` refuses a block for it, so this command is the only agent path into it.
 
 The user may also edit the section in Obsidian at any time; `kb` commits it as an outside edit.
 
@@ -726,7 +737,7 @@ The protection therefore moves from "code that cannot remove text" to "a human w
 
 ## 13. Versions, CI and maintenance
 
-A release has a version and a Git tag; the package version, skill versions, the note schema version and the configuration schema version are distinct. CI (Ubuntu and macOS) runs the tests, builds the wheel, installs it with `uv tool install` and smoke-tests the CLI on a temporary vault with a local bare remote; from v0.6 the smoke test covers `kb new topic` (including a refused duplicate), `kb rewrite` (dry-run, `--since`, approve, shrink refusal, protected section, a hand-edited line flagged), `kb link`, `kb my-words` and `kb index`; from v0.7 it covers `kb new source` (including a duplicate refused by URL) and `kb index --sources`. Updating the package never overwrites user notes; changes to the note schema or the configuration come with a migration path. CD is not required.
+The versioning policy and the migration path are in [releases.md](releases.md), the release history in [CHANGELOG.md](../CHANGELOG.md). A release has a version and a Git tag; the package version, skill versions, the note schema version and the configuration schema version are distinct. CI (Ubuntu and macOS) runs the tests, builds the wheel, installs it with `uv tool install` and smoke-tests the CLI on a temporary vault with a local bare remote; from v0.6 the smoke test covers `kb new topic` (including a refused duplicate), `kb rewrite` (dry-run, `--since`, approve, shrink refusal, protected section, a hand-edited line flagged), `kb link`, `kb my-words` and `kb index`; from v0.7 it covers `kb new source` (including a duplicate refused by URL) and `kb index --sources`. Updating the package never overwrites user notes; changes to the note schema or the configuration come with a migration path. CD is not required.
 
 ## 14. Open decisions and boundaries
 
@@ -737,7 +748,7 @@ A release has a version and a Git tag; the package version, skill versions, the 
 | Checks | The written page and its linked pages only; unlinked mentions on the written page; structural part in the CLI, content part in the skill | — |
 | Reading | Generated index plus search; profile on demand; review mode without stored state, the page as the reference | Whether spaced repetition is wanted |
 | Search | Ranked text, alias, tag and metadata search without an index (§10.4) | When to add the FTS5 cache and qmd |
-| Provenance | `created_by` at creation; trailers on every commit | Trailer queries in stage 7 |
+| Provenance | `created_by` at creation; trailers on every commit; `kb history --skill --version --reason` | — |
 | Delivery | `uv tool install` + `kb setup`, `kb update`, skills copied into clients | Release process, CD |
 | History and copy | Own Git repository, push to a private remote hourly, Time Machine | Git host; second copy and multi-device later |
 | Clients | Claude Code checked hands-on | Codex and Cursor checks; Cursor duplicates; agent detection |
@@ -768,3 +779,4 @@ A release has a version and a Git tag; the package version, skill versions, the 
 - **2.0 — 2026-10-12:** design restated around topic pages after roadmap stage 4 and the LLM Wiki research. New: the topic page contract (§6) with `summary`, `tags`, fixed sections and the protected `## In my words`; the generated index and review mode (§10); `kb rewrite` with the diff report, approval hash and shrink guard (§11.3); the check of linked pages (§11.4); targeted neighbour edits with `kb link` (§11.5); `kb my-words` (§11.6); the migration of the v1 notes (§11.7); provenance of changes in commit trailers only (§7); the trust boundary restated for rewrites (§12.4); the "not doing" list (§14.1). Frozen: the source registry (§8), other users (§4.3), separate source/research/project notes. Unchanged: delivery (§4.1), the CLI/skills split (§9.1), storage and history (§12.1–§12.3, §12.5, §12.6). Section numbers §4.1, §9.1 and §12.1–§12.6 keep their v1 meaning, so references in the code stay valid. The history of versions 1.0–1.13 is in [personal-knowledge-design-v1.md](personal-knowledge-design-v1.md).
 - **2.1 — 2026-10-19:** gaps found when checking v2.0 against the research, decided by the user. Duplicate topics: the CLI checks titles, aliases and similar titles, the skill names the closest pages from the index, aliases include abbreviations and names in the user's language; embedding similarity in the backlog (§5.1). Unlinked mentions on the written page become links on that page (§5.2, §11.4). The user's own sections are allowed and carried over (§6.2). Text from pages, sources and the conversation is data; skill texts carry no risky examples; the format reference is the skills' own, and other Obsidian skills do not change the write rule (§9.1). The page is the reference in review, and the user may set the angle of the questions (§10.3). Search ranks title and aliases first, then an FTS5 cache, then optional qmd (§10.4). The add-knowledge flow: internal previews, one plan with independently approved parts, `--since` to show only the change after the plan is edited (§11.2). `kb rewrite`: a section summary with `--sections`, flags for hand-edited lines and hidden text, drafts kept for `--since` (§11.3, §12.6). `kb my-words` callable from both skills (§11.6). §13, §14 and §14.1 updated.
 - **2.2 — 2026-10-19:** sources for later, decided by the user after `reports/Источники на потом: захват и summary.md`; planned for roadmap stage 6 (v0.7). New: the source card contract (§6.9) — `summary`, `url` or `ref`, shared tags, sections `Summary`, `Key ideas`, `Illustrations`, `How it explains`, `Use for`, `Related`, illustrations by reference, one card per source, duplicates by normalized URL, no status field and no `## In my words`, "not used yet" computed from links; the `save-source` skill (§11.8). Changed: key decision 2, scope (§2.1), components (§3), note types (§5.1), tags (§5.3), card lines in `## Sources` (§6.4), visual content (§6.6), vault structure (§6.8), the skills layer (§9.1), `kb new source`, `kb search --type source` and `kb index --sources` (§9.2, §10.1, §10.4), `kb-recall` and `add-knowledge` using the cards (§10.2, §11.2), `kb extend` for a `## Sources` line (§11.5), CI (§13), §14 and §14.1. Trailer queries move to roadmap stage 7.
+- **2.3 — 2026-11-02:** decisions made while implementing stages 5–7: what `kb rewrite` works on and how drafts are treated (§11.3), the guards around `## In my words` (§11.6), unlinked mentions (§5.2); the versioning policy (§13).

@@ -3,12 +3,15 @@ title: "Personal Knowledge System — Note Schema, Vault Structure and Configura
 document_version: "0.5"
 created: "2026-10-09"
 language: en
-status: approved_for_mvp
+status: superseded
+superseded_by: "note-schema-v1.md"
 design_ref: "personal-knowledge-design-v1.md"
 design_version: "1.13"
 ---
 
 # Note schema, vault structure and configuration v0
+
+> Superseded by [note-schema-v1.md](note-schema-v1.md) for topic pages, source cards and the profile. It stays the reference for the v1 note types and the configuration file.
 
 This document records the decisions made in roadmap stage 0. It closes open questions 4 (folder structure and metadata schema) and 12 (configuration format) from the user stories. It refines design §5–§7 and §4.2. Schema validation in the CLI (stage 2) checks exactly what is written here.
 

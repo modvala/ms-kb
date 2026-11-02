@@ -1,6 +1,6 @@
 ---
 title: "Personal Knowledge System — Roadmap"
-document_version: "2.3"
+document_version: "2.4"
 created: "2026-10-12"
 language: en
 status: draft
@@ -8,10 +8,10 @@ supersedes: "personal-knowledge-roadmap-v1.md (1.9)"
 requirements_ref: "personal-knowledge-user-stories-v2.md"
 requirements_version: "2.2"
 design_ref: "personal-knowledge-design-v2.md"
-design_version: "2.2"
+design_version: "2.3"
 ---
 
-# Personal Knowledge System — Roadmap v2.3
+# Personal Knowledge System — Roadmap v2.4
 
 ## 1. Purpose
 
@@ -35,7 +35,7 @@ The roadmap breaks [user stories v2.0](personal-knowledge-user-stories-v2.md) an
 | 7. Stabilization | v1.0 | ⬜ Not done | All skills checked in Claude Code, Codex and Cursor; provenance queries over trailers; release policy and documentation | US-12, US-15, US-23 |
 | Later | v1.x+ | — | Backlog (§4) | — |
 
-Stage status: ⬜ Not done or ✅ Done. A stage is done when all its "Done when" criteria are met; update the status here and in the stage section.
+Stages 5–7 were implemented together on one branch (roadmap 2.4); each stage's status line says what is left. Stage status: ⬜ Not done or ✅ Done. A stage is done when all its "Done when" criteria are met; update the status here and in the stage section.
 
 ## 3. Stages
 
@@ -45,7 +45,7 @@ Done between 2026-10-09 and 2026-10-11; details, results and hands-on checks are
 
 ### Stage 5. Topic pages → v0.6
 
-**Status:** ⬜ Not done
+**Status:** ⬜ Not done. Steps 5a, 5b, 5c and 5e are implemented. Left: 5d, the migration of the real vault, the hands-on check in Claude Code ([clients-v0.md §4.4](clients-v0.md)) and the release.
 
 **Goal:** the knowledge base works as the user intends — one current page per topic, explicit links, a review mode — and the six existing notes are migrated while that is cheap.
 
@@ -110,7 +110,7 @@ Work is split into five steps; each ends in a commit that keeps the tests passin
 
 ### Stage 6. Sources for later → v0.7
 
-**Status:** ⬜ Not done
+**Status:** ⬜ Not done. Steps 6a, 6b and 6c are implemented. Left: the hands-on check in Claude Code and the release.
 
 **Goal:** a source the user found interesting but does not want to turn into a topic page yet is saved as a short source card — what it says, its reusable illustrations and how it explains — and comes up again when its topic does (US-02).
 
@@ -148,7 +148,7 @@ Work is split into three steps; each ends in a commit that keeps the tests passi
 
 ### Stage 7. Stabilization → v1.0
 
-**Status:** ⬜ Not done
+**Status:** ⬜ Not done. Implemented: provenance queries (`kb history --skill --version --reason`), CI on the main scenarios with test data, the versioning policy and migration path ([releases.md](releases.md)), the release history ([CHANGELOG.md](../CHANGELOG.md)), the documentation. Left: the hands-on checks in Codex and Cursor, the calibration on real rewrites and the `v1.0.0` tag.
 
 **Goal:** the system is fit for daily use in all three clients.
 
@@ -227,3 +227,4 @@ Kept as possible directions, not planned: separate `research` / `project` notes 
 - **2.1 — 2026-10-19:** stage 5 extended with the decisions of design 2.1: duplicate checks with aliases and search ranking (5a); `--sections` and the section summary, flags for hand-edited lines and hidden text, `--since`, unlinked mentions on the written page (5b); the updated skill flows, the page as the reference in review, `kb my-words` from both skills, the skills' own format reference and the write rule with other Obsidian skills (5c); tests and "done when" (5e). Backlog: FTS5 cache, embedding duplicates, "keep" markers. Risks: duplicates, reverted hand edits, hidden instructions.
 - **2.2 — 2026-10-19:** sources for later, decided by the user after `reports/Источники на потом: захват и summary.md`. New stage 6 "Sources for later" (v0.7) with steps 6a–6c: the source card in the CLI (`url` or `ref`, duplicates by normalized URL, `kb search --type source`, `kb index --sources` with the count of linking topic pages), the `save-source` skill, `add-knowledge` and `kb-recall` using the cards. Step 5a defines the card contract in `note-schema-v1.md`. Stabilization moves to stage 7 (v1.0) and checks `save-source` too. Backlog: a Web Clipper template (later); `kb attach` frozen; `source` notes and `save-source` leave the frozen list. Risks: cards from unopened sources, copies, unused cards.
 - **2.3 — 2026-11-02:** backlog: saving a Claude artifact unchanged from Claude Code with a `save-artifact` skill (Claude and Claude Code only), with its open questions. No stage changes.
+- **2.4 — 2026-11-02:** the code and documents of stages 5–7 implemented together on one branch; each stage's status line says what is left. Packaged releases wait for the hands-on checks, so the package version stays 0.5.0 until `v0.6.0`.

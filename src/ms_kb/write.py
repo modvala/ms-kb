@@ -287,6 +287,8 @@ def rewrite_note(
                           f"this is a {note.meta.get('type', 'file without a type')}"])
     if is_profile and (summary or tags or aliases):
         raise WriteError([f"{PROFILE} takes only a body"])
+    if not one_line(reason):
+        raise WriteError(["--reason is empty: say why the page changes"])
     text = body.strip()
     if not text:
         raise WriteError(["the draft is empty"])

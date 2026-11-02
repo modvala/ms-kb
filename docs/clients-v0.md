@@ -1,11 +1,11 @@
 ---
 title: "Personal Knowledge System — Client Skills and Instructions v0"
-document_version: "0.6"
+document_version: "0.7"
 created: "2026-10-09"
 language: en
 status: approved_for_mvp
 design_ref: "personal-knowledge-design-v2.md"
-design_version: "2.2"
+design_version: "2.3"
 ---
 
 # Client skills and instructions v0
@@ -108,6 +108,26 @@ Run on the real vault `~/Knowledge/main` (Claude Code desktop Code tab, 2026-10-
 
 Found and fixed during the check: `kb doctor` printed `kb restore concepts/Global Interpreter Lock.md` without quotes, so the suggested command failed in a shell; paths in hints are now shell-quoted.
 
+### 4.4. Stages 5–7: topic pages, review, source cards (pending)
+
+The skills 0.7.0 and the CLI are covered by tests and the CI smoke script on test data. Nothing here has been run by hand yet.
+
+| Check | Claude Code | Codex | Cursor |
+|---|---|---|---|
+| `add-knowledge` after a research conversation: one page, one plan, link lines, report of linked pages; a second run changes the same page | pending | pending | pending |
+| A draft keeps unchanged sections as they are (`--sections` warning stays quiet); practitioners report Codex rewriting whole pages | pending | pending | pending |
+| A line edited by hand in Obsidian is flagged in the next plan | pending | pending | pending |
+| A second page on the same topic is refused and the skill updates the first | pending | pending | pending |
+| `kb-recall`: finds a topic through the index, starts from the user's words and open questions | pending | pending | pending |
+| Review mode: recall first, the page as the reference, writes only a confirmed `## In my words` | pending | pending | pending |
+| `save-source` on an opened article: one card after one approval; a second run on the URL proposes extending | pending | pending | pending |
+| `save-source` on a source it cannot open: asks for the text, makes no card without it | pending | pending | pending |
+| `kb-recall` mentions the cards on a topic; `add-knowledge` offers them as sources | pending | pending | pending |
+| `kb-recall` with `kb` unavailable | pending | pending | pending |
+| `kb update` installs three skills and the instruction | pending | pending | pending |
+| Cursor shows no duplicate skills | — | — | pending |
+| The environment variable identifying the client, for `Kb-Agent` | `CLAUDECODE=1` | pending | pending |
+
 ## 5. Portable `SKILL.md` v0
 
 Every skill shipped by the package follows these rules, so one file works in all three clients:
@@ -136,3 +156,4 @@ metadata:
 - **0.4 — 2026-10-11:** roadmap stage 4: the hands-on check of history, `kb sync`, `kb restore` and `kb update` on the real vault (§4.3).
 - **0.5 — 2026-10-12:** the hands-on checks in Codex and Cursor move to roadmap stage 6 (stabilization), after the new stage 5 "Topic pages" ([roadmap v2.0](personal-knowledge-roadmap-v2.md)); design reference updated to [design v2](personal-knowledge-design-v2.md).
 - **0.6 — 2026-10-19:** the hands-on checks in Codex and Cursor move to roadmap stage 7 (stabilization), after the new stage 6 "Sources for later" ([roadmap v2.2](personal-knowledge-roadmap-v2.md)).
+- **0.7 — 2026-11-02:** the checklist of stages 5–7 (§4.4), all pending.

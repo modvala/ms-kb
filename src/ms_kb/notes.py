@@ -91,7 +91,7 @@ def slugify(text: str) -> str:
 
 
 def note_rel_path(note_type: str, title: str, slug: str | None = None, session_date: str | None = None) -> Path:
-    """Path of a new note relative to the vault (note-schema-v0 §4)."""
+    """Path of a new note relative to the vault (note-schema-v1 §4)."""
     folder = Path(TYPE_DIRS[note_type])
     if note_type in ("research", "learning-session"):
         if slug is None:
