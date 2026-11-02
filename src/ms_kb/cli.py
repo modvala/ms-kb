@@ -24,16 +24,16 @@ from ms_kb.schema import validate
 from ms_kb.search import note_files, search
 from ms_kb.installer import SkillError, check_installed, install_skills, outdated_skills
 from ms_kb.instructions import check_instructions, install_instructions, instruction_text
-from ms_kb import history, integrity, schedule, vaultstate
+from ms_kb import catalogue, history, integrity, pagecheck, rewrite_report, schedule, vaultstate
 from ms_kb.history import GitError
 from ms_kb.provenance import REPO_URL, trailers
-from ms_kb.secretscan import find_secrets
+from ms_kb.secretscan import find_hidden, find_secrets
 from ms_kb.vault import check_vault, has_notes, init_vault
-from ms_kb.write import WriteError, extend_note, new_note, save
+from ms_kb.write import WriteError, extend_note, link_note, my_words_note, new_note, rewrite_note, save
 
 DEFAULT_KB = "main"
 DEFAULT_VAULT = "~/Knowledge/main"
-PROFILE_MAX_LINES = 150  # note-schema-v0 §5
+PROFILE_MAX_LINES = 150  # note-schema-v1 §5
 
 
 def _error(message: str) -> int:
@@ -522,14 +522,15 @@ def cmd_search(args: argparse.Namespace) -> int:
         fields = _parse_fields(args.field)
     except ValueError as e:
         return _error(str(e))
-    hits = search(_vault(), args.terms, args.type, args.topic, fields, args.limit)
+    hits = search(_vault(), args.terms, args.type, args.tag, fields, args.limit)
     if args.json:
         print(json.dumps([h.as_dict() for h in hits], ensure_ascii=False, indent=2))
         return 0
     if not hits:
         print("No notes found.")
     for h in hits:
-        topics = f"  ({', '.join(h.topics)})" if h.topics else ""
+        labels = h.tags or h.topics
+        topics = f"  ({', '.join(labels)})" if labels else ""
         print(f"{h.path}  [{h.type}] {h.title}{topics}")
         if h.snippet:
             print(f"    {h.snippet}")
@@ -555,10 +556,12 @@ def _check_secrets(result, allow: bool) -> None:
              for n, kind in found]
             + ["remove it and run the command again (if it is not a secret, the user can pass --allow-secret-like)"]
         )
+    if result.reason and find_secrets(result.reason):
+        raise WriteError(["the reason looks like it contains a secret; it would stay in the history"])
 
 
 def _commit(vault: Path, state: dict, rels: list[str], subject: str, extra: dict | None = None,
-            skill: str | None = None) -> None:
+            skill: str | None = None, reason: str | None = None) -> None:
     """Commit kb's own write; a Git problem is a warning, never a failed write (design §12.1)."""
     try:
         status, _ = history.repo_status(vault)
@@ -566,7 +569,7 @@ def _commit(vault: Path, state: dict, rels: list[str], subject: str, extra: dict
             if status != "foreign":
                 _warn("the vault has no Git history yet; run kb init")
             return
-        commit = history.commit_write(vault, rels, subject, trailers(skill) | (extra or {}))
+        commit = history.commit_write(vault, rels, subject, trailers(skill, reason) | (extra or {}))
         vaultstate.git_ok(state, "last_commit", commit.rev)
     except GitError as e:
         _warn(f"written but not committed: {e}")
@@ -588,6 +591,9 @@ def _commit_external(vault: Path, state: dict) -> list[tuple[str, str]]:
         return []
 
 
+VERBS = {"created": "create", "extended": "extend", "rewritten": "rewrite", "linked": "link", "my-words": "my-words"}
+
+
 def _finish(result, dry_run: bool, skill: str | None = None, allow_secret: bool = False) -> int:
     for w in result.warnings:
         _warn(w)
@@ -597,6 +603,8 @@ def _finish(result, dry_run: bool, skill: str | None = None, allow_secret: bool 
         print(f"unchanged {result.rel}")
         return 0
     _check_secrets(result, allow_secret)
+    for n, line in find_hidden(result.text, result.original):
+        _warn(f"{result.rel}: line {n} holds text hidden in Obsidian's reading view: {line}")
     if dry_run:
         print(f"would be {result.action} {result.rel}")
         print(result.text, end="")
@@ -606,8 +614,8 @@ def _finish(result, dry_run: bool, skill: str | None = None, allow_secret: bool 
         state = vaultstate.load(name)
         _report_excluded(_commit_external(vault, state))
         save(result)
-        verb = "create" if result.action == "created" else "extend"
-        _commit(vault, state, [result.rel], f"kb: {verb} {result.rel}", skill=skill)
+        verb = VERBS[result.action]
+        _commit(vault, state, [result.rel], f"kb: {verb} {result.rel}", skill=skill, reason=result.reason)
         vaultstate.record(state, vault, result.rel, f"kb {verb}")
         vaultstate.save(name, state)
     sections = f" (sections: {', '.join(result.sections)})" if result.sections else ""
@@ -616,8 +624,9 @@ def _finish(result, dry_run: bool, skill: str | None = None, allow_secret: bool 
 
 
 def cmd_new(args: argparse.Namespace) -> int:
+    vault = _vault()
     result = new_note(
-        _vault(),
+        vault,
         args.type,
         args.title,
         args.topic,
@@ -631,8 +640,18 @@ def cmd_new(args: argparse.Namespace) -> int:
         session_date=args.session_date,
         skill=args.skill,
         allow_similar=args.allow_similar,
+        summary=args.summary,
+        tags=args.tag,
+        created=args.created,
+        ref=args.ref,
+        author=args.author,
+        published=args.published,
     )
-    return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
+    code = _finish(result, args.dry_run, args.skill, args.allow_secret_like)
+    if args.dry_run and args.type in ("topic", "source"):
+        print()
+        print("\n".join(pagecheck.check(vault, result.rel, result.text)))
+    return code
 
 
 def cmd_extend(args: argparse.Namespace) -> int:
@@ -643,13 +662,80 @@ def cmd_extend(args: argparse.Namespace) -> int:
         _vault(),
         args.path,
         fragment=body,
-        summary=args.summary,
+        reason=args.reason,
         topics=args.topic,
         related=args.related,
         sources=args.source,
         skill=args.skill,
     )
     return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
+
+
+def cmd_rewrite(args: argparse.Namespace) -> int:
+    """The diff gate: `--dry-run` reports and gives a hash, `--approve` writes only that hash (design §11.3)."""
+    if args.since and not args.dry_run:
+        return _error("--since goes with --dry-run")
+    name, vault, _ = _kb()
+    result = rewrite_note(
+        vault,
+        args.path,
+        _read_body(args.body_file),
+        reason=args.reason,
+        summary=args.summary,
+        tags=args.tag,
+        aliases=args.alias,
+        skill=args.skill,
+    )
+    if result.action == "unchanged":
+        print(f"unchanged {result.rel}")
+        return 0
+    key = rewrite_report.approval_hash(result.rel, result.original, result.text)
+    if args.dry_run:
+        _check_secrets(result, args.allow_secret_like)
+        for w in result.warnings:
+            _warn(w)
+        print(rewrite_report.build(vault, result, key, args.sections, args.allow_shrink,
+                                   args.since, vaultstate.read_draft(name, args.since) if args.since else None))
+        vaultstate.save_draft(name, key, result.text)
+        return 0
+    if args.approve != key:
+        return _error("the page or the draft changed after review; run --dry-run again and show the new report")
+    if not args.allow_shrink and (ratio := rewrite_report.shrink_ratio(result)) < rewrite_report.SHRINK_LIMIT:
+        return _error(f"the body would shrink to {ratio:.0%} of its size; "
+                      "only the user can allow this, with --allow-shrink")
+    code = _finish(result, False, args.skill, args.allow_secret_like)
+    vaultstate.drop_draft(name, key)
+    return code
+
+
+def cmd_link(args: argparse.Namespace) -> int:
+    result = link_note(_vault(), args.src, args.target, args.why, args.skill)
+    return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
+
+
+def cmd_my_words(args: argparse.Namespace) -> int:
+    result = my_words_note(_vault(), args.path, _read_body(args.body_file), args.skill)
+    return _finish(result, args.dry_run, args.skill, args.allow_secret_like)
+
+
+def cmd_index(args: argparse.Namespace) -> int:
+    if args.tags and args.sources:
+        return _error("--tags and --sources are separate views; pass one of them")
+    vault = _vault()
+    if args.tags:
+        counts = catalogue.tag_counts(vault)
+        if args.json:
+            print(json.dumps(counts, ensure_ascii=False, indent=2))
+        else:
+            print("\n".join(f"{tag}  {n}" for tag, n in counts.items()) or "No tags yet.")
+        return 0
+    entries = catalogue.entries(vault, "source" if args.sources else "topic", args.tag)
+    if args.json:
+        print(json.dumps([e.as_dict() for e in entries], ensure_ascii=False, indent=2))
+    else:
+        empty = "No source cards" if args.sources else "No topic pages"
+        print("\n".join(catalogue.render(entries, args.tag)) or f"{empty} {'under this tag' if args.tag else 'yet'}.")
+    return 0
 
 
 def _note_arg(vault: Path, arg: str) -> Path:
@@ -709,12 +795,14 @@ def cmd_history(args: argparse.Namespace) -> int:
     if history.repo_status(vault)[0] != "own":
         return _error("the vault has no Git history; run kb init")
     rel = _rel_arg(vault, args.path) if args.path else None
-    entries = history.log(vault, rel, args.deleted, args.limit)
+    entries = history.log(vault, rel, args.deleted, args.limit, args.skill, args.skill_version, args.reason)
     if not entries:
         print("No history." if not args.deleted else "No deleted files in the history.")
     for e in entries:
-        skill = f"  [{e.skill}]" if e.skill else ""
+        skill = f"  [{' '.join(filter(None, (e.skill, e.version)))}]" if e.skill else ""
         print(f"{e.rev}  {e.date}  {e.subject}{skill}")
+        if e.reason:
+            print(f"    reason: {e.reason}")
         if args.deleted or not rel:
             for status, path in e.files:
                 print(f"    {status:4} {path}")
@@ -825,24 +913,38 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_install_skills)
 
     p = sub.add_parser("search", help="find notes by text, type, topics and fields")
-    p.add_argument("terms", nargs="*", help="words that must all occur (title, aliases, topics or text)")
+    p.add_argument("terms", nargs="*", help="words that must all occur (title, aliases, summary, tags or text)")
     p.add_argument("--type", choices=NOTE_TYPES)
-    p.add_argument("--topic", action="append", default=[], help="required topic; repeatable")
+    p.add_argument("--tag", "--topic", dest="tag", action="append", default=[],
+                   help="required tag, nested tags match (python matches python/asyncio); repeatable")
     p.add_argument("--field", action="append", default=[], metavar="KEY=VALUE",
                    help="frontmatter match, dotted keys allowed (created_by.skill=add-knowledge); repeatable")
     p.add_argument("--limit", type=int, default=20, help="maximum results (default 20, 0 = all)")
     p.add_argument("--json", action="store_true", help="JSON output with absolute paths")
     p.set_defaults(func=cmd_search)
 
-    p = sub.add_parser("new", help="create a note; refuses duplicates")
+    p = sub.add_parser("index", help="the generated catalogue of topic pages; writes nothing")
+    p.add_argument("--tag", help="only this tag and the tags nested under it")
+    p.add_argument("--tags", action="store_true", help="the tag vocabulary with counts")
+    p.add_argument("--sources", action="store_true", help="the source cards, with the topic pages linking to each")
+    p.add_argument("--json", action="store_true", help="JSON output with absolute paths")
+    p.set_defaults(func=cmd_index)
+
+    p = sub.add_parser("new", help="create a topic page, a source card or a v1 note; refuses duplicates")
     p.add_argument("type", choices=NOTE_TYPES)
     p.add_argument("--title", required=True)
-    p.add_argument("--topic", action="append", default=[], help="kebab-case topic; repeatable, at least one")
+    p.add_argument("--summary", help="one line for the index (topic, source)")
+    p.add_argument("--tag", action="append", default=[], help="1-3 tags, e.g. python/concurrency (topic, source)")
+    p.add_argument("--created", help="YYYY-MM-DD, for migrated pages (default today)")
+    p.add_argument("--ref", help="author, title, edition or a local path, for a source without a URL (source)")
+    p.add_argument("--author", help="as given by the source (source)")
+    p.add_argument("--published", help="YYYY-MM-DD (source)")
+    p.add_argument("--topic", action="append", default=[], help="kebab-case topic of a v1 note; repeatable")
     p.add_argument("--slug", help="file name slug for research and learning-session notes")
     p.add_argument("--alias", action="append", default=[])
     p.add_argument("--related", action="append", default=[], help="note name or [[link]]; repeatable")
     p.add_argument("--source", action="append", default=[], help="URL or [[source-note]]; repeatable")
-    p.add_argument("--url", help="source URL (source notes)")
+    p.add_argument("--url", help="URL of the source (source)")
     p.add_argument("--as-of", help="YYYY-MM-DD the comparison applies to (research; default today)")
     p.add_argument("--session-date", help="YYYY-MM-DD (learning-session; default today)")
     p.add_argument("--body-file", metavar="FILE", help="Markdown body; - reads stdin (default: the type template)")
@@ -857,15 +959,53 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path", help="note path, absolute or relative to the vault")
     p.add_argument("--body-file", metavar="FILE",
                    help="'## Section' blocks appended to those sections; - reads stdin")
-    p.add_argument("--summary", help="one line on what changed (required with --skill, except for learning_profile.md)")
+    p.add_argument("--reason", "--summary", dest="reason",
+                   help="one line on why it changed (required with --skill, except for learning_profile.md)")
     p.add_argument("--topic", action="append", default=[])
     p.add_argument("--related", action="append", default=[])
     p.add_argument("--source", action="append", default=[])
-    p.add_argument("--skill", help="add an updates entry for this skill, e.g. add-knowledge")
+    p.add_argument("--skill", help="mark the commit with this skill, e.g. add-knowledge")
     p.add_argument("--allow-secret-like", action="store_true",
                    help="write even if the text looks like it contains a key or token (for the user, not skills)")
     p.add_argument("--dry-run", action="store_true", help="print the result instead of writing it")
     p.set_defaults(func=cmd_extend)
+
+    secret_help = "write even if the text looks like it contains a key or token (for the user, not skills)"
+
+    p = sub.add_parser("rewrite", help="replace a topic page or the profile through an approved diff")
+    p.add_argument("path", help="page path, absolute or relative to the vault")
+    p.add_argument("--body-file", metavar="FILE", required=True, help="the full new body; - reads stdin")
+    p.add_argument("--reason", required=True, help="one line on why the page changes; goes to the commit")
+    p.add_argument("--summary", help="a new summary line")
+    p.add_argument("--tag", action="append", default=[], help="replaces the tags; repeatable")
+    p.add_argument("--alias", action="append", default=[], help="replaces the aliases; repeatable")
+    p.add_argument("--sections", help="comma-separated sections the draft means to change; others are flagged")
+    mode = p.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true", help="print the report and the approval hash; writes nothing")
+    mode.add_argument("--approve", metavar="HASH", help="write, if HASH is the hash of exactly this change")
+    p.add_argument("--since", metavar="HASH", help="with --dry-run: also show the change since that reviewed draft")
+    p.add_argument("--allow-shrink", action="store_true",
+                   help="allow a body under half of the current one (for the user, not skills)")
+    p.add_argument("--skill", help="mark the commit with this skill, e.g. add-knowledge")
+    p.add_argument("--allow-secret-like", action="store_true", help=secret_help)
+    p.set_defaults(func=cmd_rewrite)
+
+    p = sub.add_parser("link", help="add one line to ## Related of a page")
+    p.add_argument("src", help="the page that gets the line, absolute or relative to the vault")
+    p.add_argument("target", help="the page or alias it links to; must resolve")
+    p.add_argument("--why", required=True, help="how the two relate")
+    p.add_argument("--skill", help="mark the commit with this skill, e.g. add-knowledge")
+    p.add_argument("--allow-secret-like", action="store_true", help=secret_help)
+    p.add_argument("--dry-run", action="store_true", help="print the result instead of writing it")
+    p.set_defaults(func=cmd_link)
+
+    p = sub.add_parser("my-words", help="replace ## In my words with the user's text, exactly as given")
+    p.add_argument("path", help="page path, absolute or relative to the vault")
+    p.add_argument("--body-file", metavar="FILE", required=True, help="the user's text; - reads stdin")
+    p.add_argument("--skill", help="mark the commit with this skill, e.g. kb-recall")
+    p.add_argument("--allow-secret-like", action="store_true", help=secret_help)
+    p.add_argument("--dry-run", action="store_true", help="print the result instead of writing it")
+    p.set_defaults(func=cmd_my_words)
 
     p = sub.add_parser("validate", help="check notes against the schema")
     p.add_argument("paths", nargs="*", help="notes to check (default: the whole vault)")
@@ -874,6 +1014,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("history", help="the vault's change history (Git), including deleted notes")
     p.add_argument("path", nargs="?", help="a note, also a deleted one (default: all changes)")
     p.add_argument("--deleted", action="store_true", help="only commits that deleted files")
+    p.add_argument("--skill", help="only commits made by this skill")
+    p.add_argument("--version", dest="skill_version", help="only commits made by this skill version")
+    p.add_argument("--reason", help="only commits whose recorded reason contains this text")
     p.add_argument("--limit", type=int, default=20, help="maximum commits (default 20, 0 = all)")
     p.set_defaults(func=cmd_history)
 

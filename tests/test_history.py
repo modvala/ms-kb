@@ -119,7 +119,7 @@ def test_history_of_a_note_and_deleted_files(vault, monkeypatch, capsys):
 
     assert main(["history", "concepts/RAG.md"]) == 0
     out = capsys.readouterr().out
-    assert "kb: create concepts/RAG.md  [add-knowledge]" in out
+    assert "kb: create concepts/RAG.md  [add-knowledge " in out
     assert "external: 1 file changed outside kb" in out
 
     assert main(["history", "--deleted"]) == 0
@@ -135,3 +135,29 @@ def test_profile_commit_carries_skill(vault, monkeypatch):
     assert message.startswith("kb: extend learning_profile.md")
     assert "Kb-Skill: add-knowledge" in message
     assert "updates:" not in (vault / "learning_profile.md").read_text()
+
+
+def test_history_queries_over_trailers(vault, monkeypatch, capsys):
+    assert run_new(monkeypatch, "RAG", "## Explanation\nText.\n", "--skill", "add-knowledge") == 0
+    assert run_new(monkeypatch, "Other", "## Explanation\nText.\n", "--skill", "kb-recall") == 0
+    monkeypatch.setattr("sys.stdin", io.StringIO("## Insights\n- x\n"))
+    assert main(["extend", "concepts/RAG.md", "--reason", "Reranking   trade-offs", "--skill", "add-knowledge",
+                 "--body-file", "-"]) == 0
+    capsys.readouterr()
+
+    def out(*args):
+        assert main(["history", *args]) == 0
+        return capsys.readouterr().out
+
+    by_skill = out("--skill", "kb-recall")
+    assert "concepts/Other.md" in by_skill and "concepts/RAG.md" not in by_skill
+    assert "No history." in out("--skill", "add-knowledge", "--version", "9.9.9")
+    version = history.log(vault, skill="add-knowledge")[0].version
+    assert version
+    assert len(history.log(vault, skill="add-knowledge", version=version)) == 2
+
+    by_reason = out("concepts/RAG.md", "--reason", "reranking")
+    assert "kb: extend concepts/RAG.md" in by_reason
+    assert "reason: Reranking trade-offs" in by_reason
+    assert "kb: create" not in by_reason
+    assert len(history.log(vault, skill="add-knowledge", limit=1)) == 1

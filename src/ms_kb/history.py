@@ -203,12 +203,20 @@ class LogEntry:
     subject: str
     skill: str
     files: list[tuple[str, str]]  # (status, path)
+    version: str = ""
+    reason: str = ""
 
 
-def log(vault: Path, path: str | None = None, deleted: bool = False, limit: int = 20) -> list[LogEntry]:
+def log(vault: Path, path: str | None = None, deleted: bool = False, limit: int = 20,
+        skill: str | None = None, version: str | None = None, reason: str | None = None) -> list[LogEntry]:
+    """Commits, newest first; `skill`, `version` and `reason` select by provenance trailers (design §7)."""
+    filtered = skill or version or reason
     args = ["log", "--date=short", "--name-status",
-            "--format=%x1e%h%x1f%ad%x1f%s%x1f%(trailers:key=Kb-Skill,valueonly,separator=%x2C)"]
-    if limit:
+            "--format=%x1e%h%x1f%ad%x1f%s"
+            "%x1f%(trailers:key=Kb-Skill,valueonly,separator=%x2C)"
+            "%x1f%(trailers:key=Kb-Skill-Version,valueonly,separator=%x2C)"
+            "%x1f%(trailers:key=Kb-Reason,valueonly,separator=%x2C)"]
+    if limit and not filtered:
         args.append(f"-n{limit}")
     if deleted:
         args.append("--diff-filter=D")
@@ -221,15 +229,46 @@ def log(vault: Path, path: str | None = None, deleted: bool = False, limit: int 
         check(r)
     entries = []
     for record in r.stdout.split("\x1e")[1:]:
+        # A trailer value never holds a newline, but the empty ones may end the format line.
         head_line, _, rest = record.partition("\n")
-        rev, date, subject, skill = (head_line.split("\x1f") + ["", "", "", ""])[:4]
+        rev, date, subject, skill_, version_, reason_ = (head_line.split("\x1f") + [""] * 6)[:6]
         files = []
         for line in rest.splitlines():
             if line.strip():
                 status, _, name = line.partition("\t")
                 files.append((status, name.replace("\t", " -> ")))
-        entries.append(LogEntry(rev, date, subject, skill.strip(), files))
-    return entries
+        entry = LogEntry(rev, date, subject, skill_.strip(), files, version_.strip(), reason_.strip())
+        if skill and entry.skill != skill:
+            continue
+        if version and entry.version != version:
+            continue
+        if reason and reason.casefold() not in entry.reason.casefold():
+            continue
+        entries.append(entry)
+    return entries[:limit] if limit else entries
+
+
+def hand_edited(vault: Path, rel: str) -> dict[str, str]:
+    """Line -> date for lines last changed outside kb, or not committed yet (design §12.6)."""
+    out = check(run(vault, "blame", "--porcelain", "--", rel)).stdout
+    commits: dict[str, dict[str, str]] = {}
+    result, current = {}, None
+    for line in out.splitlines():
+        if line.startswith("\t"):
+            info = commits[current]
+            if current.strip("0") == "":
+                result[line[1:]] = "not committed yet"
+            elif info.get("summary", "").startswith("external:"):
+                stamp = int(info.get("committer-time", "0"))
+                result[line[1:]] = f"edited by hand on {time.strftime('%Y-%m-%d', time.localtime(stamp))}"
+            continue
+        key, _, value = line.partition(" ")
+        if len(key) >= 40 and all(c in "0123456789abcdef" for c in key):
+            current = key
+            commits.setdefault(current, {})
+        elif current is not None:
+            commits[current][key] = value
+    return result
 
 
 def show(vault: Path, rev: str, rel: str) -> bytes:

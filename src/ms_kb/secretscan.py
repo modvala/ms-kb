@@ -19,6 +19,20 @@ PATTERNS = {
 }
 
 
+HIDDEN = re.compile(r"<!--|%%|[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
+
+
+def find_hidden(text: str, original: str | None = None) -> list[tuple[int, str]]:
+    """(line number, line) of added lines holding text not shown in Obsidian's reading view (design §12.6).
+
+    Invisible characters are escaped in the returned line so that they can be seen.
+    """
+    old = set(original.splitlines()) if original is not None else set()
+    return [(n, line.encode("unicode_escape").decode("ascii") if not line.isascii() else line)
+            for n, line in enumerate(text.splitlines(), 1)
+            if line not in old and HIDDEN.search(line)]
+
+
 def _gitleaks(text: str) -> bool:
     """True when gitleaks is installed and reports a leak in `text`."""
     exe = shutil.which("gitleaks")

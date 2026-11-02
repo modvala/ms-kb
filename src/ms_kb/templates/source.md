@@ -1,23 +1,24 @@
 ---
 type: source
 title: "{{title}}"
+summary: ""
 url: ""
+tags: []
 created: "{{date:YYYY-MM-DD}}"
 updated: "{{date:YYYY-MM-DD}}"
-topics: []
-related: []
+aliases: []
 ---
 
 # {{title}}
 
 ## Summary
 
-A short summary in my own words. Not a copy of the source.
+## Key ideas
 
-## Key takeaways
+## Illustrations
 
-## Why I saved it
+## How it explains
 
-## Source
+## Use for
 
 ## Related

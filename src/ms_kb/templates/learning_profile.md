@@ -7,8 +7,4 @@ updated: "{{date:YYYY-MM-DD}}"
 
 ## Current directions
 
-## Known topics
-
-## Recently studied
-
-## Open questions
+## Preferences

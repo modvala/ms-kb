@@ -1,4 +1,4 @@
-"""Provenance stamped by the CLI, not written by the model (note-schema-v0 §3, US-12)."""
+"""Provenance stamped by the CLI, not written by the model (note-schema-v1 §3, US-12)."""
 
 import os
 import re
@@ -35,26 +35,29 @@ def detect_agent(env=None) -> str | None:
     return None
 
 
-def stamp(skill: str, day: str, summary: str | None = None) -> tuple[CommentedMap, list[str]]:
-    """A `created_by` entry, or an `updates` entry when `summary` is given."""
+def stamp(skill: str, day: str) -> tuple[CommentedMap, list[str]]:
+    """A `created_by` entry; changes are recorded in commit trailers (design §7)."""
     skill_version, package, warning = provenance_versions(skill)
     entry = CommentedMap()
-    if summary is not None:
-        entry["date"] = q(day)
     entry["skill"] = skill
     entry["skill_version"] = q(skill_version)
     entry["package_version"] = q(__version__)
     entry["skill_ref"] = q(skill_ref(skill, package))
-    if summary is None:
-        entry["date"] = q(day)
+    entry["date"] = q(day)
     if agent := detect_agent():
         entry["agent"] = agent
-    if summary is not None:
-        entry["summary"] = q(summary)
     return entry, [warning] if warning else []
 
 
-def trailers(skill: str | None) -> dict[str, str]:
+def skill_warnings(skill: str | None) -> list[str]:
+    """What a write marked with `skill` should warn about; an unknown skill is refused."""
+    if not skill:
+        return []
+    warning = provenance_versions(skill)[2]
+    return [warning] if warning else []
+
+
+def trailers(skill: str | None, reason: str | None = None) -> dict[str, str]:
     """Git trailers for a kb commit: the same provenance as the note (design §12.1)."""
     result = {}
     if skill:
@@ -63,4 +66,6 @@ def trailers(skill: str | None) -> dict[str, str]:
     result["Kb-Version"] = __version__
     if agent := detect_agent():
         result["Kb-Agent"] = agent
+    if reason:
+        result["Kb-Reason"] = reason
     return result

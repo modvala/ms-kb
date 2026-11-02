@@ -9,3 +9,5 @@ build/
 # Personal knowledge never goes into the repository
 vault/
 *.vault/
+# Local tickets (mattpocock-skills)
+.scratch/

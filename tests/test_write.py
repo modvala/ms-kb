@@ -96,7 +96,7 @@ def test_new_dry_run(vault, kb, capsys):
     assert not (vault / "research" / "agent-memory.md").exists()
 
 
-def test_extend_appends_and_stamps_update(vault, kb, capsys):
+def test_extend_appends_without_updates_entry(vault, kb, capsys):
     new_rag(kb)
     before = (vault / "concepts" / "RAG.md").read_text()
     fragment = "## Limitations\n- Depends on the retriever.\n- Long contexts dilute attention.\n\n## Insights\nReranking helps.\n"
@@ -113,9 +113,7 @@ def test_extend_appends_and_stamps_update(vault, kb, capsys):
     assert list(note.meta["topics"]) == ["rag", "retrieval"]
     assert list(note.meta["related"]) == ["[[Reranking]]"]
     assert note.meta["created_by"]["date"] == TODAY
-    [update] = note.meta["updates"]
-    assert update["summary"] == "Added limits"
-    assert update["skill"] == "add-knowledge"
+    assert "updates" not in note.meta  # provenance of changes is in the commit trailers (design §7)
     # the old text is still there, line for line
     old_body = before.split("---\n", 2)[2]
     assert all(line in text for line in old_body.splitlines())
@@ -139,14 +137,14 @@ def test_extend_hand_written_note_gets_no_created_by(vault, kb):
               stdin="## Insights\n- new\n") == 0
     note = read_note(path)
     assert "created_by" not in note.meta
-    assert len(note.meta["updates"]) == 1
+    assert "updates" not in note.meta
     assert "created: 2026-01-01" in path.read_text()
 
 
-def test_extend_requires_summary_with_skill(vault, kb, capsys):
+def test_extend_requires_reason_with_skill(vault, kb, capsys):
     new_rag(kb)
     assert kb("extend", "concepts/RAG.md", "--skill", "add-knowledge", "--body-file", "-", stdin="## A\n- x\n") == 1
-    assert "--summary" in capsys.readouterr().err
+    assert "--reason" in capsys.readouterr().err
 
 
 def test_extend_refuses_paths_outside_vault(vault, kb, tmp_path, capsys):
@@ -182,7 +180,7 @@ def test_extend_learning_profile(vault, kb):
     fragment = f"## Recently studied\n- {TODAY} — [[s]]\n"
     assert kb("extend", "learning_profile.md", "--body-file", "-", stdin=fragment) == 0
     text = (vault / "learning_profile.md").read_text()
-    assert f"## Recently studied\n\n- {TODAY} — [[s]]\n\n## Open questions" in text
+    assert f"## Recently studied\n\n- {TODAY} — [[s]]\n" in text
     assert "updates" not in text
     assert kb("extend", "learning_profile.md", "--topic", "x") == 1
 

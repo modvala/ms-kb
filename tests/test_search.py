@@ -44,8 +44,8 @@ def test_alias_match(tmp_path):
 def test_type_and_topic_filters(tmp_path):
     vault = make_vault(tmp_path)
     assert rels(search(vault, note_type="learning-session")) == ["learning-sessions/2026-10-02-rag.md"]
-    assert rels(search(vault, topics=["retrieval"])) == ["concepts/Reranking.md", "concepts/RAG.md"]
-    assert rels(search(vault, topics=["rag", "retrieval"])) == ["concepts/RAG.md"]
+    assert rels(search(vault, tags=["retrieval"])) == ["concepts/Reranking.md", "concepts/RAG.md"]
+    assert rels(search(vault, tags=["rag", "retrieval"])) == ["concepts/RAG.md"]
 
 
 def test_field_filter_dotted_and_lists(tmp_path):

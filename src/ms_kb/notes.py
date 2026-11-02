@@ -1,4 +1,4 @@
-"""Notes: frontmatter, file names and body sections (note-schema-v0 §1–§4)."""
+"""Notes: frontmatter, file names and body sections (note-schema-v1 §1–§4)."""
 
 import re
 import unicodedata
@@ -12,6 +12,7 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 TYPE_DIRS = {
+    "topic": "topics",
     "concept": "concepts",
     "source": "sources",
     "research": "research",
@@ -20,6 +21,10 @@ TYPE_DIRS = {
 }
 NOTE_TYPES = tuple(TYPE_DIRS)
 PROFILE = "learning_profile.md"
+MY_WORDS = "In my words"
+# Fixed sections, in order (design §6.2, §6.9).
+TOPIC_SECTIONS = ("Summary", MY_WORDS, "Key ideas", "Details", "Open questions", "Related", "Sources")
+SOURCE_SECTIONS = ("Summary", "Key ideas", "Illustrations", "How it explains", "Use for", "Related")
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)^---[ \t]*\n?", re.S | re.M)
 _FORBIDDEN = re.compile(r'[/\\:*?"<>|#^\[\]]')
@@ -170,11 +175,22 @@ def _is_bullet(line: str) -> bool:
     return bool(_BULLET.match(line))
 
 
-def append_to_section(body: str, name: str, text: str) -> tuple[str, list[str]]:
+def _insert_at(lines: list[str], name: str, order: tuple[str, ...]) -> int:
+    """Where a missing `## name` section goes: before the next fixed section, else before Related."""
+    later = order[order.index(name) + 1 :] if name in order else ()
+    if not order and name.casefold() != "related":
+        later = ("Related",)
+    spans = [span[0] for section in later if (span := _section_span(lines, section))]
+    return min(spans) if spans else len(lines)
+
+
+def append_to_section(body: str, name: str, text: str, order: tuple[str, ...] = ()) -> tuple[str, list[str]]:
     """Append `text` to the end of the `## name` section, creating it if missing.
 
-    Bullet lines already present in the section are skipped. Returns the new body
-    and the skipped lines; the body is unchanged when nothing is left to add.
+    `order` lists the note type's fixed sections, so a created section keeps
+    their order. Bullet lines already present in the section are skipped. Returns
+    the new body and the skipped lines; the body is unchanged when nothing is
+    left to add.
     """
     lines = body.splitlines()
     span = _section_span(lines, name)
@@ -192,8 +208,7 @@ def append_to_section(body: str, name: str, text: str) -> tuple[str, list[str]]:
         return body, skipped
 
     if span is None:
-        related = _section_span(lines, "Related") if name.casefold() != "related" else None
-        at = related[0] if related else len(lines)
+        at = _insert_at(lines, name, order)
         head = lines[:at]
         while head and not head[-1].strip():
             head.pop()
@@ -211,6 +226,45 @@ def append_to_section(body: str, name: str, text: str) -> tuple[str, list[str]]:
         tail = [""] if end < len(lines) else []
         lines = lines[: start + 1] + content + gap + new + tail + lines[end:]
     return "\n".join(lines).rstrip("\n") + "\n", skipped
+
+
+def section_text(body: str, name: str) -> str | None:
+    """The content of `## name` without the blank lines around it; None if there is no such section."""
+    lines = body.splitlines()
+    span = _section_span(lines, name)
+    return None if span is None else "\n".join(lines[span[0] + 1 : span[1]]).strip("\n")
+
+
+def replace_section(body: str, name: str, text: str, order: tuple[str, ...] = ()) -> str:
+    """Put exactly `text` into `## name`, creating the section if missing."""
+    lines = body.splitlines()
+    span = _section_span(lines, name)
+    block = [f"## {name}", ""] + ([*text.split("\n"), ""] if text else [])
+    if span is None:
+        at = _insert_at(lines, name, order)
+        head = lines[:at]
+        while head and not head[-1].strip():
+            head.pop()
+        lines = head + ["", *block] + lines[at:]
+    else:
+        lines = lines[: span[0]] + block + lines[span[1] :]
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def has_heading(text: str) -> bool:
+    """A `#` or `##` heading outside code fences, which would split a section."""
+    return bool(_headings(text.splitlines()))
+
+
+def split_sections(body: str) -> dict[str, str]:
+    """`## name` -> content, with "" for whatever comes before the first section."""
+    lines = body.splitlines()
+    heads = [(i, name) for i, level, name in _headings(lines) if level == 2]
+    result = {"": "\n".join(lines[: heads[0][0]] if heads else lines)}
+    for n, (i, name) in enumerate(heads):
+        end = next((j for j, _, _ in _headings(lines) if j > i), len(lines))
+        result[name] = "\n".join(lines[i + 1 : end])
+    return result
 
 
 def parse_fragment(text: str) -> list[tuple[str, str]]:

@@ -5,14 +5,15 @@ import pytest
 
 from ms_kb.vault import NOTE_TEMPLATES, VAULT_DIRS, check_vault, has_notes, init_vault
 
-# note-schema-v0 §1–§2
-COMMON_FIELDS = {"type", "title", "created", "updated", "topics"}
+# note-schema-v1 §1–§2
+COMMON_FIELDS = {"type", "title", "created", "updated"}
 TYPE_FIELDS = {
-    "concept": set(),
-    "source": {"url"},
-    "research": {"as_of", "sources"},
-    "learning-session": {"session_date"},
-    "project": set(),
+    "topic": {"summary", "tags"},
+    "source": {"summary", "tags", "url"},
+    "concept": {"topics"},
+    "research": {"topics", "as_of", "sources"},
+    "learning-session": {"topics", "session_date"},
+    "project": {"topics"},
 }
 
 

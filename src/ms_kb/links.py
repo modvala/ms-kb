@@ -30,11 +30,19 @@ def vault_files(vault: Path) -> list[Path]:
     return [p for p in vault.rglob("*") if p.is_file() and not SKIP_DIRS & set(p.relative_to(vault).parts)]
 
 
+def self_names(rel: str, meta) -> set[str]:
+    """The link targets that point to the note at `rel`: path, file name, title and aliases."""
+    stem = rel.removesuffix(".md").lower()
+    names = {stem, stem.rsplit("/", 1)[-1]}
+    names |= {str(a).lower() for a in (meta.get("aliases") or []) if a}
+    return names
+
+
 class Resolver:
     def __init__(self, vault: Path):
-        self.paths: set[str] = set()
-        self.names: set[str] = set()
-        self.aliases: set[str] = set()
+        self.paths: dict[str, Path] = {}
+        self.names: dict[str, Path] = {}
+        self.aliases: dict[str, Path] = {}
         for path in vault_files(vault):
             rel = path.relative_to(vault).as_posix()
             if path.suffix == ".md":
@@ -43,12 +51,18 @@ class Resolver:
                     aliases = parse(path.read_text(encoding="utf-8")).meta.get("aliases") or []
                 except (NoteError, UnicodeDecodeError, OSError):
                     aliases = []
-                self.aliases.update(str(a).lower() for a in aliases if a)
+                for a in aliases:
+                    if a:
+                        self.aliases.setdefault(str(a).lower(), path)
             rel = rel.lower()
-            self.paths.add(rel)
-            self.names.add(rel.rsplit("/", 1)[-1])
+            self.paths[rel] = path
+            self.names.setdefault(rel.rsplit("/", 1)[-1], path)
+
+    def find(self, target: str) -> Path | None:
+        """The file a normalized target points to."""
+        if "/" in target:
+            return next((path for p, path in self.paths.items() if p == target or p.endswith(f"/{target}")), None)
+        return self.names.get(target) or self.aliases.get(target)
 
     def resolves(self, target: str) -> bool:
-        if "/" in target:
-            return any(p == target or p.endswith(f"/{target}") for p in self.paths)
-        return target in self.names or target in self.aliases
+        return self.find(target) is not None

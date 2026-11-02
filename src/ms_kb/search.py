@@ -1,13 +1,14 @@
-"""Search by type, topics, frontmatter fields and text; duplicate detection.
+"""Search by type, tags, frontmatter fields and text; duplicate detection.
 
 No index and no embeddings (US-08): the vault is scanned on every call.
 """
 
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ms_kb.notes import TYPE_DIRS, Note, NoteError, read_note
 
@@ -42,6 +43,8 @@ class Hit:
     updated: str
     score: int
     snippet: str
+    tags: list[str] = field(default_factory=list)
+    summary: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -49,6 +52,8 @@ class Hit:
             "type": self.type,
             "title": self.title,
             "topics": self.topics,
+            "tags": self.tags,
+            "summary": self.summary,
             "updated": self.updated,
             "score": self.score,
             "snippet": self.snippet,
@@ -77,20 +82,31 @@ def _strings(value) -> list[str]:
 
 
 def _score(term: str, path: Path, note: Note) -> int:
+    """Title and aliases outrank summary and tags, which outrank the body (design §10.4)."""
     meta = note.meta
     score = 0
     title = str(meta.get("title", "")).casefold()
     aliases = [a.casefold() for a in _strings(meta.get("aliases"))]
     if term in (title, path.stem.casefold(), *aliases):
-        score += 20
+        score += 100
     elif term in title or term in path.stem.casefold():
-        score += 10
+        score += 50
     elif any(term in a for a in aliases):
-        score += 8
-    if any(term.replace(" ", "-") in t.casefold() for t in _strings(meta.get("topics"))):
-        score += 5
+        score += 40
+    if term in str(meta.get("summary", "")).casefold():
+        score += 6
+    labels = _strings(meta.get("tags")) + _strings(meta.get("topics"))
+    if any(term.replace(" ", "-") in t.casefold() for t in labels):
+        score += 6
+    if any(term in str(meta.get(key, "")).casefold() for key in ("url", "ref", "author")):
+        score += 6
     score += min(note.body.casefold().count(term), 5)
     return score
+
+
+def tag_matches(wanted: str, tag: str) -> bool:
+    """`python` matches `python` and `python/concurrency` (design §5.3)."""
+    return tag == wanted or tag.startswith(f"{wanted}/")
 
 
 def _snippet(body: str, terms: list[str]) -> str:
@@ -106,7 +122,7 @@ def search(
     vault: Path,
     terms: list[str] = (),
     note_type: str | None = None,
-    topics: list[str] = (),
+    tags: list[str] = (),
     fields: dict[str, str] | None = None,
     limit: int | None = None,
 ) -> list[Hit]:
@@ -117,7 +133,8 @@ def search(
         if note_type and meta.get("type") != note_type:
             continue
         note_topics = _strings(meta.get("topics"))
-        if any(t not in note_topics for t in topics):
+        note_tags = _strings(meta.get("tags"))
+        if any(not any(tag_matches(t, have) for have in note_tags + note_topics) for t in tags):
             continue
         if fields and any(v not in map(str, field_values(meta, k)) for k, v in fields.items()):
             continue
@@ -134,6 +151,8 @@ def search(
                 updated=str(meta.get("updated", "")),
                 score=sum(scores),
                 snippet=_snippet(note.body, terms),
+                tags=note_tags,
+                summary=str(meta.get("summary", "")),
             )
         )
     # Stable sorts: best score first, then the most recently updated, then by path.
@@ -150,14 +169,23 @@ def norm(text: str) -> str:
     return "".join(ch for ch in text.casefold() if ch.isalnum())
 
 
+def norm_url(url: str) -> str:
+    """Lowercase scheme and host, no fragment, trailing slash or `utm_*` parameters (design §6.9)."""
+    parts = urlsplit(url.strip())
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+                       if not k.lower().startswith("utm_")])
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), query, ""))
+
+
 def find_duplicates(
-    vault: Path, note_type: str, title: str, aliases: list[str], rel_path: Path
+    vault: Path, note_type: str, title: str, aliases: list[str], rel_path: Path, url: str | None = None
 ) -> tuple[list[str], list[str]]:
     """(exact, similar) relative paths of notes a new note would duplicate.
 
     Exact: the same file, the same file name in any folder (it would make
-    [[links]] ambiguous), or the same title/alias within the type. Similar:
-    a close title within the type. Learning sessions are dated and expected to
+    [[links]] ambiguous), the same title/alias within the type or, for a source
+    card, the same normalized URL. Similar: a close title or alias within the
+    type. Learning sessions are dated and expected to
     repeat a topic, so only the file itself counts for them.
     """
     exact, similar = [], []
@@ -177,7 +205,8 @@ def find_duplicates(
             continue
         theirs = {norm(str(meta.get("title", "")))} | {norm(a) for a in _strings(meta.get("aliases"))}
         theirs.discard("")
-        if keys & theirs:
+        same_url = url and meta.get("url") and norm_url(url) == norm_url(str(meta["url"]))
+        if same_url or keys & theirs:
             exact.append(rel)
         elif any(SequenceMatcher(None, a, b).ratio() >= SIMILARITY for a in keys for b in theirs):
             similar.append(rel)

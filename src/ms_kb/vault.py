@@ -1,4 +1,4 @@
-"""Vault structure (note-schema-v0 §4): create what is missing, never overwrite.
+"""Vault structure (note-schema-v1 §4): create what is missing, never overwrite.
 
 Regenerable files (folders, templates, README) are recreated freely; user data
 (the learning profile) only on a new vault or on request (design §12.4).
@@ -11,6 +11,7 @@ from pathlib import Path
 from ms_kb.notes import PROFILE
 
 VAULT_DIRS = (
+    "topics",
     "concepts",
     "sources",
     "research",
@@ -19,7 +20,7 @@ VAULT_DIRS = (
     "attachments",
     "templates",
 )
-NOTE_TEMPLATES = ("concept", "source", "research", "learning-session", "project")
+NOTE_TEMPLATES = ("topic", "concept", "source", "research", "learning-session", "project")
 
 
 def _template(name: str) -> str:
@@ -36,7 +37,7 @@ def _vault_files() -> dict[str, str]:
 
 def _user_files() -> dict[str, str]:
     """User data created once on a new vault (design §12.4). Once written, only
-    the user and `kb extend` change it, so a missing copy is a loss to restore,
+    the user, `kb rewrite` and `kb extend` change it, so a missing copy is a loss to restore,
     not a file to regenerate."""
     today = date.today().isoformat()
     return {PROFILE: _template("learning_profile.md").replace("{{date:YYYY-MM-DD}}", today)}

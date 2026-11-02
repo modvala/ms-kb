@@ -68,6 +68,33 @@ def lock(name: str):
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
+DRAFT_DAYS = 7
+
+
+def _drafts(name: str) -> Path:
+    return config_path().parent / f"drafts-{name}"
+
+
+def save_draft(name: str, key: str, text: str) -> None:
+    """Keep a reviewed draft outside the vault for `--since`; old ones are pruned (design §12.6)."""
+    folder = _drafts(name)
+    folder.mkdir(parents=True, exist_ok=True)
+    limit = time.time() - DRAFT_DAYS * 86400
+    for old in folder.glob("*.md"):
+        if old.stat().st_mtime < limit:
+            old.unlink(missing_ok=True)
+    (folder / f"{key}.md").write_text(text, encoding="utf-8")
+
+
+def read_draft(name: str, key: str) -> str | None:
+    path = _drafts(name) / f"{key}.md"
+    return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
+def drop_draft(name: str, key: str) -> None:
+    (_drafts(name) / f"{key}.md").unlink(missing_ok=True)
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
