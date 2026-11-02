@@ -8,7 +8,7 @@ from datetime import date
 
 import pytest
 
-from ms_kb import pagecheck
+from ms_kb import history, pagecheck
 from ms_kb.cli import main
 from ms_kb.notes import parse, read_note, section_text
 from ms_kb.schema import validate
@@ -269,8 +269,7 @@ def test_rewrite_hand_edited_lines_flagged(page, vault, kb, capsys):
     page.write_text(text)
     out, _ = dry_run(kb, capsys)  # the draft goes back to the agent's line, the edit is not committed yet
     assert "not committed yet: Threads share memory, edited by hand." in out
-    subprocess.run(["git", "-C", str(vault), "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(vault), "commit", "-qm", "external: 1 file changed outside kb"], check=True)
+    assert history.commit_external(vault).committed
     out, _ = dry_run(kb, capsys)
     assert f"edited by hand on {TODAY}: Threads share memory, edited by hand." in out
 
